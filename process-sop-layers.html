@@ -1,0 +1,717 @@
+<!doctype html>
+<title>How the Process Layer and SOP Layer Interlink</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #f2f3f6;
+    --surface: #fcfcfc;
+    --surface-2: #ffffff;
+    --border: #d9dce3;
+    --ink: #191b24;
+    --ink-muted: #5b6072;
+    --ink-faint: #8a8fa0;
+    --process: #4a5fd9;
+    --process-soft: #e7e9fb;
+    --sop: #b5701c;
+    --sop-soft: #fbeedd;
+    --edge: #b7bccb;
+    --edge-active: #6a6f88;
+    --shadow: 0 1px 2px rgba(25, 27, 36, 0.06), 0 6px 16px -8px rgba(25, 27, 36, 0.12);
+    --radius: 10px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14151b;
+      --surface: #1a1c22;
+      --surface-2: #20222a;
+      --border: #33364000;
+      --border: #34374199;
+      --ink: #e9eaf0;
+      --ink-muted: #9599ab;
+      --ink-faint: #6d7186;
+      --process: #7885e8;
+      --process-soft: #262a48;
+      --sop: #d99a4e;
+      --sop-soft: #3a2c17;
+      --edge: #40434f;
+      --edge-active: #7d829a;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -10px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #14151b;
+    --surface: #1a1c22;
+    --surface-2: #20222a;
+    --border: #34374199;
+    --ink: #e9eaf0;
+    --ink-muted: #9599ab;
+    --ink-faint: #6d7186;
+    --process: #7885e8;
+    --process-soft: #262a48;
+    --sop: #d99a4e;
+    --sop-soft: #3a2c17;
+    --edge: #40434f;
+    --edge-active: #7d829a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -10px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f2f3f6;
+    --surface: #fcfcfc;
+    --surface-2: #ffffff;
+    --border: #d9dce3;
+    --ink: #191b24;
+    --ink-muted: #5b6072;
+    --ink-faint: #8a8fa0;
+    --process: #4a5fd9;
+    --process-soft: #e7e9fb;
+    --sop: #b5701c;
+    --sop-soft: #fbeedd;
+    --edge: #b7bccb;
+    --edge-active: #6a6f88;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.5;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  header.intro {
+    margin-bottom: 28px;
+  }
+
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: clamp(24px, 3.4vw, 34px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+
+  .lede {
+    max-width: 68ch;
+    color: var(--ink-muted);
+    font-size: 15.5px;
+    margin: 0;
+  }
+
+  .lede strong.process { color: var(--process); font-weight: 700; }
+  .lede strong.sop { color: var(--sop); font-weight: 700; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 24px 0 32px;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+  }
+
+  .stat .n {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .stat .l {
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    margin-top: 2px;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 13px;
+    color: var(--ink-muted);
+    flex-wrap: wrap;
+  }
+
+  .legend .item { display: flex; align-items: center; gap: 7px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .swatch.process { background: var(--process); }
+  .swatch.sop { background: var(--sop); }
+  .legend .hint { color: var(--ink-faint); }
+
+  button.util {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  button.util:hover { border-color: var(--ink-faint); }
+  button.util:focus-visible, .step:focus-visible, .sop:focus-visible { outline: 2px solid var(--process); outline-offset: 2px; }
+
+  .diagram {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 26px 22px 30px;
+    overflow: visible;
+  }
+
+  .layer-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+  }
+  .layer-label .swatch { width: 9px; height: 9px; }
+
+  .process-layer .groups {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .group {
+    background: var(--process-soft);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 10px;
+    transition: opacity 160ms ease;
+  }
+
+  .group h3 {
+    margin: 0 0 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+
+  .steps { display: flex; flex-direction: column; gap: 6px; }
+
+  button.step {
+    all: unset;
+    cursor: pointer;
+    display: block;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 9px;
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.3;
+    transition: transform 120ms ease, border-color 120ms ease, opacity 160ms ease, box-shadow 120ms ease;
+  }
+
+  button.step:hover { border-color: var(--process); }
+
+  .spacer { height: 46px; }
+
+  .sop-layer .sop-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  button.sop {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--sop-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    min-width: 168px;
+    flex: 1 1 168px;
+    max-width: 240px;
+    transition: transform 120ms ease, border-color 120ms ease, opacity 160ms ease, box-shadow 120ms ease;
+  }
+
+  button.sop:hover { border-color: var(--sop); }
+
+  .sop .id {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--sop);
+    letter-spacing: 0.01em;
+  }
+
+  .sop .name {
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+
+  .sop .shared-badge {
+    margin-top: 3px;
+    font-size: 10.5px;
+    color: var(--ink-faint);
+  }
+
+  /* selection state (specificity matches "button.step"/"button.sop" all:unset so it actually wins) */
+  button.node-dim { opacity: 0.32; }
+  button.node-active {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+  button.step.node-active { border-color: var(--process); }
+  button.sop.node-active { border-color: var(--sop); }
+  .group.has-active { opacity: 1; }
+
+  svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  svg.edges path { fill: none; stroke: var(--edge); stroke-width: 1.4; opacity: 0.55; transition: opacity 160ms ease, stroke 160ms ease, stroke-width 160ms ease; }
+  svg.edges path.active { stroke: var(--edge-active); stroke-width: 2; opacity: 0.95; }
+  svg.edges path.dim { opacity: 0.08; }
+
+  .tooltip {
+    position: fixed;
+    z-index: 20;
+    max-width: 260px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 10px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+  .tooltip.show { opacity: 1; transform: translateY(0); }
+  .tooltip b { font-weight: 700; }
+
+  .table-wrap {
+    margin-top: 22px;
+    display: none;
+  }
+  .table-wrap.show { display: block; }
+
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    min-width: 640px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 700;
+    background: var(--surface-2);
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+  td.sop-id { color: var(--sop); font-weight: 600; }
+
+  footer.note {
+    margin-top: 22px;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 920px) {
+    .process-layer .groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .process-layer .groups { grid-template-columns: 1fr; }
+    svg.edges { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <p class="eyebrow">Operating model</p>
+    <h1>How the Process Layer and SOP Layer interlink</h1>
+    <p class="lede">
+      The <strong class="process">Process Layer</strong> defines <em>what</em> happens and in what
+      order &mdash; the business activities grouped into end-to-end processes. The
+      <strong class="sop">SOP Layer</strong> defines <em>how</em> each activity is actually carried
+      out &mdash; the documented, repeatable procedures. They aren't a strict one-to-one hierarchy:
+      a single SOP is often written once and reused by several process steps, which is what makes
+      the two layers a network rather than a tree. Click any box to trace its connections.
+    </p>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <div class="legend">
+      <span class="item"><span class="swatch process"></span> Process Layer</span>
+      <span class="item"><span class="swatch sop"></span> SOP Layer</span>
+      <span class="hint">Click to trace &middot; click again to clear</span>
+    </div>
+    <button class="util" id="toggleTable" type="button" aria-expanded="false">Show as table</button>
+  </div>
+
+  <div class="diagram" id="diagram">
+    <svg class="edges" id="edges" aria-hidden="true"></svg>
+
+    <div class="process-layer">
+      <p class="layer-label"><span class="swatch process"></span>Process layer &mdash; groups &amp; steps</p>
+      <div class="groups" id="groups"></div>
+    </div>
+
+    <div class="spacer" aria-hidden="true"></div>
+
+    <div class="sop-layer">
+      <p class="layer-label"><span class="swatch sop"></span>SOP layer &mdash; standard operating procedures</p>
+      <div class="sop-grid" id="sops"></div>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Process group</th><th>Process step</th><th>SOP</th><th>SOP title</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer class="note">
+    Example operating model shown for illustration. Swap the <code class="mono">groups</code> and
+    <code class="mono">sops</code> arrays in the page source with your own process taxonomy and SOP
+    register to reuse this for a real org.
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip" role="tooltip"></div>
+
+<script>
+  const groups = [
+    { id: 'onboarding', name: 'Customer Onboarding', steps: [
+      { id: 's-identity', name: 'Identity & Eligibility Check' },
+      { id: 's-provision', name: 'Account Provisioning' },
+      { id: 's-welcome', name: 'Welcome & Orientation' },
+    ]},
+    { id: 'fulfillment', name: 'Order Fulfillment', steps: [
+      { id: 's-intake', name: 'Order Intake & Validation' },
+      { id: 's-payment', name: 'Payment Processing' },
+      { id: 's-pick', name: 'Pick, Pack & Dispatch' },
+      { id: 's-delivery', name: 'Delivery Confirmation' },
+    ]},
+    { id: 'incident', name: 'Incident & Complaint Handling', steps: [
+      { id: 's-log', name: 'Intake & Logging' },
+      { id: 's-rootcause', name: 'Investigation & Root Cause' },
+      { id: 's-resolve', name: 'Resolution & Follow-up' },
+      { id: 's-escalate', name: 'Escalation to Management' },
+    ]},
+    { id: 'qa', name: 'Quality Assurance', steps: [
+      { id: 's-audit', name: 'Internal Audit' },
+      { id: 's-corrective', name: 'Corrective Action' },
+      { id: 's-improve', name: 'Continuous Improvement Review' },
+    ]},
+    { id: 'hr', name: 'Employee Onboarding', steps: [
+      { id: 's-paperwork', name: 'Paperwork & Compliance' },
+      { id: 's-itprovision', name: 'IT & Systems Provisioning' },
+      { id: 's-training', name: 'Role-Specific Training' },
+    ]},
+  ];
+
+  const sops = [
+    { id: 'SOP-101', name: 'Identity Verification Procedure', steps: ['s-identity', 's-intake'] },
+    { id: 'SOP-102', name: 'Account Setup Checklist', steps: ['s-provision'] },
+    { id: 'SOP-103', name: 'Customer Welcome Communication', steps: ['s-welcome'] },
+    { id: 'SOP-201', name: 'Order Intake & Data Validation', steps: ['s-intake'] },
+    { id: 'SOP-202', name: 'Payment Authorization & Fraud Check', steps: ['s-payment'] },
+    { id: 'SOP-203', name: 'Warehouse Pick-Pack Standard', steps: ['s-pick'] },
+    { id: 'SOP-204', name: 'Delivery Confirmation & Proof of Receipt', steps: ['s-delivery'] },
+    { id: 'SOP-301', name: 'Complaint Intake & Categorization', steps: ['s-log'] },
+    { id: 'SOP-302', name: 'Root Cause Investigation Method', steps: ['s-rootcause'] },
+    { id: 'SOP-303', name: 'Customer Resolution & Follow-up', steps: ['s-resolve'] },
+    { id: 'SOP-304', name: 'Escalation Matrix & Authority Levels', steps: ['s-escalate', 's-payment', 's-corrective'] },
+    { id: 'SOP-401', name: 'Internal Audit Checklist', steps: ['s-audit'] },
+    { id: 'SOP-402', name: 'Corrective & Preventive Action (CAPA)', steps: ['s-corrective', 's-rootcause'] },
+    { id: 'SOP-403', name: 'Continuous Improvement Review Cycle', steps: ['s-improve'] },
+    { id: 'SOP-501', name: 'New Hire Compliance Paperwork', steps: ['s-paperwork'] },
+    { id: 'SOP-502', name: 'IT Access Provisioning Standard', steps: ['s-itprovision'] },
+    { id: 'SOP-503', name: 'Role Training Curriculum', steps: ['s-training'] },
+  ];
+
+  const stepIndex = new Map();
+  groups.forEach(g => g.steps.forEach(s => stepIndex.set(s.id, { ...s, group: g })));
+
+  const sopsByStep = new Map();
+  sops.forEach(sop => sop.steps.forEach(stepId => {
+    if (!sopsByStep.has(stepId)) sopsByStep.set(stepId, []);
+    sopsByStep.get(stepId).push(sop);
+  }));
+
+  const totalSteps = groups.reduce((n, g) => n + g.steps.length, 0);
+  const sharedSops = sops.filter(s => s.steps.length > 1).length;
+
+  const statsEl = document.getElementById('stats');
+  [
+    [groups.length, 'Process groups'],
+    [totalSteps, 'Process steps'],
+    [sops.length, 'SOPs in the register'],
+    [sharedSops, 'SOPs reused across processes'],
+  ].forEach(([n, l]) => {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<div class="n">${n}</div><div class="l">${l}</div>`;
+    statsEl.appendChild(d);
+  });
+
+  const groupsEl = document.getElementById('groups');
+  groups.forEach(g => {
+    const gEl = document.createElement('div');
+    gEl.className = 'group';
+    gEl.dataset.group = g.id;
+    gEl.innerHTML = `<h3>${g.name}</h3><div class="steps"></div>`;
+    const stepsEl = gEl.querySelector('.steps');
+    g.steps.forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'step';
+      btn.type = 'button';
+      btn.dataset.id = s.id;
+      btn.dataset.kind = 'step';
+      btn.textContent = s.name;
+      stepsEl.appendChild(btn);
+    });
+    groupsEl.appendChild(gEl);
+  });
+
+  const sopsEl = document.getElementById('sops');
+  sops.forEach(sop => {
+    const btn = document.createElement('button');
+    btn.className = 'sop';
+    btn.type = 'button';
+    btn.dataset.id = sop.id;
+    btn.dataset.kind = 'sop';
+    const shared = sop.steps.length > 1
+      ? `<div class="shared-badge">used in ${sop.steps.length} steps</div>` : '';
+    btn.innerHTML = `<span class="id mono">${sop.id}</span><span class="name">${sop.name}</span>${shared}`;
+    sopsEl.appendChild(btn);
+  });
+
+  // table view
+  const tableBody = document.getElementById('tableBody');
+  const rows = [];
+  groups.forEach(g => g.steps.forEach(s => {
+    (sopsByStep.get(s.id) || []).forEach(sop => rows.push([g.name, s.name, sop.id, sop.name]));
+  }));
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r[0]}</td><td>${r[1]}</td><td class="sop-id mono">${r[2]}</td><td>${r[3]}</td>`;
+    tableBody.appendChild(tr);
+  });
+
+  const toggleBtn = document.getElementById('toggleTable');
+  const tableWrap = document.getElementById('tableWrap');
+  toggleBtn.addEventListener('click', () => {
+    const show = !tableWrap.classList.contains('show');
+    tableWrap.classList.toggle('show', show);
+    toggleBtn.textContent = show ? 'Hide table' : 'Show as table';
+    toggleBtn.setAttribute('aria-expanded', String(show));
+  });
+
+  // edges
+  const diagram = document.getElementById('diagram');
+  const svg = document.getElementById('edges');
+  const NS = 'http://www.w3.org/2000/svg';
+
+  function edgeList() {
+    const list = [];
+    sops.forEach(sop => sop.steps.forEach(stepId => list.push({ stepId, sopId: sop.id })));
+    return list;
+  }
+
+  function drawEdges() {
+    svg.innerHTML = '';
+    const box = diagram.getBoundingClientRect();
+    edgeList().forEach(({ stepId, sopId }) => {
+      const stepEl = diagram.querySelector(`.step[data-id="${stepId}"]`);
+      const sopEl = diagram.querySelector(`.sop[data-id="${sopId}"]`);
+      if (!stepEl || !sopEl) return;
+      const a = stepEl.getBoundingClientRect();
+      const b = sopEl.getBoundingClientRect();
+      const x1 = a.left - box.left + a.width / 2;
+      const y1 = a.bottom - box.top;
+      const x2 = b.left - box.left + b.width / 2;
+      const y2 = b.top - box.top;
+      const mid = (y1 + y2) / 2;
+      const d = `M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`;
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.dataset.step = stepId;
+      path.dataset.sop = sopId;
+      svg.appendChild(path);
+    });
+  }
+
+  let selected = null; // { kind, id }
+
+  function relatedIds(kind, id) {
+    if (kind === 'step') {
+      const related = (sopsByStep.get(id) || []).map(s => s.id);
+      return { steps: [id], sops: related };
+    }
+    const sop = sops.find(s => s.id === id);
+    return { steps: sop ? sop.steps.slice() : [], sops: [id] };
+  }
+
+  function applySelection() {
+    const stepEls = diagram.querySelectorAll('.step');
+    const sopEls = diagram.querySelectorAll('.sop');
+    const groupEls = diagram.querySelectorAll('.group');
+    const edgeEls = svg.querySelectorAll('path');
+
+    if (!selected) {
+      stepEls.forEach(el => el.classList.remove('node-active', 'node-dim'));
+      sopEls.forEach(el => el.classList.remove('node-active', 'node-dim'));
+      groupEls.forEach(el => el.classList.remove('has-active'));
+      edgeEls.forEach(el => el.classList.remove('active', 'dim'));
+      return;
+    }
+
+    const { steps, sops: relatedSops } = relatedIds(selected.kind, selected.id);
+    const stepSet = new Set(steps);
+    const sopSet = new Set(relatedSops);
+
+    stepEls.forEach(el => {
+      const on = stepSet.has(el.dataset.id);
+      el.classList.toggle('node-active', on);
+      el.classList.toggle('node-dim', !on);
+    });
+    sopEls.forEach(el => {
+      const on = sopSet.has(el.dataset.id);
+      el.classList.toggle('node-active', on);
+      el.classList.toggle('node-dim', !on);
+    });
+    groupEls.forEach(el => {
+      const hasActive = [...el.querySelectorAll('.step')].some(s => stepSet.has(s.dataset.id));
+      el.classList.toggle('has-active', hasActive);
+    });
+    edgeEls.forEach(el => {
+      const on = stepSet.has(el.dataset.step) && sopSet.has(el.dataset.sop);
+      el.classList.toggle('active', on);
+      el.classList.toggle('dim', !on);
+    });
+  }
+
+  diagram.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-kind]');
+    if (!btn) { selected = null; applySelection(); return; }
+    const kind = btn.dataset.kind, id = btn.dataset.id;
+    selected = (selected && selected.kind === kind && selected.id === id) ? null : { kind, id };
+    applySelection();
+  });
+
+  // tooltip
+  const tooltip = document.getElementById('tooltip');
+  function tooltipFor(btn) {
+    if (btn.dataset.kind === 'step') {
+      const linked = sopsByStep.get(btn.dataset.id) || [];
+      if (!linked.length) return `<b>${btn.textContent}</b><br>No SOP documented yet`;
+      return `<b>${btn.textContent}</b><br>Governed by: ${linked.map(s => s.id).join(', ')}`;
+    }
+    const sop = sops.find(s => s.id === btn.dataset.id);
+    const names = sop.steps.map(id => stepIndex.get(id)?.name).filter(Boolean);
+    return `<b>${sop.id}</b> &mdash; ${sop.name}<br>Used in: ${names.join(', ')}`;
+  }
+
+  diagram.addEventListener('mousemove', e => {
+    const btn = e.target.closest('button[data-kind]');
+    if (!btn) { tooltip.classList.remove('show'); return; }
+    tooltip.innerHTML = tooltipFor(btn);
+    tooltip.classList.add('show');
+    const pad = 14;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    const tw = 260, th = tooltip.offsetHeight || 40;
+    if (x + tw > window.innerWidth) x = e.clientX - tw - pad;
+    if (y + th > window.innerHeight) y = e.clientY - th - pad;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+  });
+  diagram.addEventListener('mouseleave', () => tooltip.classList.remove('show'));
+
+  let resizeRaf;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(drawEdges);
+  });
+
+  requestAnimationFrame(() => requestAnimationFrame(drawEdges));
+
+  const root = document.documentElement;
+  const themeObserver = new MutationObserver(() => requestAnimationFrame(drawEdges));
+  themeObserver.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
