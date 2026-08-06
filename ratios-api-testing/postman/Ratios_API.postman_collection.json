@@ -1,0 +1,458 @@
+{
+  "info": {
+    "name": "Ratios API",
+    "description": "Manual/exploratory + smoke test collection for the Ratios API. Pairs with TESTING_PLAN.md. Uses the 'Ratios API - Sandbox' environment for all variables/secrets.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({ key: 'apikey', value: pm.environment.get('apikey') });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Authentication",
+      "item": [
+        {
+          "name": "Get JWT Token (password grant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('access_token present', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "if (json.access_token) pm.environment.set('access_token', json.access_token);",
+                  "if (json.refresh_token) pm.environment.set('refresh_token', json.refresh_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "apikey", "value": "{{apikey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/v1/token?grant_type=password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "token"],
+              "query": [{ "key": "grant_type", "value": "password" }]
+            }
+          }
+        },
+        {
+          "name": "Get JWT Token - wrong password (expect 400/401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('is rejected (4xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "apikey", "value": "{{apikey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"definitely-wrong-password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/v1/token?grant_type=password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "v1", "token"],
+              "query": [{ "key": "grant_type", "value": "password" }]
+            }
+          }
+        },
+        {
+          "name": "List Tenants (find tenant_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tenants",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tenants"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Clients",
+      "item": [
+        {
+          "name": "List Clients (paginate + filter + order example)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&page=1&per_page=10&order_by=company_name&order_dir=asc",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "10" },
+                { "key": "order_by", "value": "company_name" },
+                { "key": "order_dir", "value": "asc" },
+                { "key": "filter.city", "value": "eq.København", "disabled": true },
+                { "key": "select", "value": "id,company_name,email", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "const id = json.data && json.data.id;",
+                  "if (id) pm.environment.set('client_id_created', id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"{{test_prefix}}Test Company ApS\",\n  \"email\": \"qa-test-client@example.com\",\n  \"city\": \"København\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Client by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients/{{client_id_created}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients", "{{client_id_created}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Update Client (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Aarhus\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients/{{client_id_created}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients", "{{client_id_created}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Delete Client (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients/{{client_id_created}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients", "{{client_id_created}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Tasks",
+      "item": [
+        {
+          "name": "List Task Statuses (lookup)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/task_statuses?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "task_statuses"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "List Tasks",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks?tenant_id={{tenant_id}}&page=1&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "const id = json.data && json.data.id;",
+                  "if (id) pm.environment.set('task_id_created', id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{test_prefix}}Test Task\",\n  \"client_id\": \"{{client_id_created}}\",\n  \"deadline\": \"2026-09-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Update Task (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{test_prefix}}Test Task (updated)\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks/{{task_id_created}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks", "{{task_id_created}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Delete Task (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks/{{task_id_created}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks", "{{task_id_created}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Users (Profiles)",
+      "item": [
+        {
+          "name": "List Profiles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/profiles?tenant_id={{tenant_id}}&page=1&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "profiles"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create User (profiles/create-user) - admin/owner only",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"qa-test-user@example.com\",\n  \"first_name\": \"{{test_prefix}}QA\",\n  \"last_name\": \"Test\",\n  \"role\": \"member\",\n  \"send_welcome_email\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/profiles/create-user?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "profiles", "create-user"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Partner OAuth2 (optional)",
+      "item": [
+        {
+          "name": "Exchange Authorization Code for Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.access_token) pm.environment.set('partner_access_token', json.access_token);",
+                  "  if (json.refresh_token) pm.environment.set('partner_refresh_token', json.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"token\",\n  \"grant_type\": \"authorization_code\",\n  \"client_id\": \"{{partner_client_id}}\",\n  \"client_secret\": \"{{partner_client_secret}}\",\n  \"code\": \"{{partner_auth_code}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/partner-token-exchange",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "partner-token-exchange"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Partner Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.access_token) pm.environment.set('partner_access_token', json.access_token);",
+                  "  if (json.refresh_token) pm.environment.set('partner_refresh_token', json.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"token\",\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"{{partner_client_id}}\",\n  \"client_secret\": \"{{partner_client_secret}}\",\n  \"refresh_token\": \"{{partner_refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/partner-token-exchange",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "partner-token-exchange"]
+            }
+          }
+        },
+        {
+          "name": "Validate / Introspect Partner Token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"validate\",\n  \"access_token\": \"{{partner_access_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/partner-token-exchange",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "partner-token-exchange"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
