@@ -1,0 +1,3 @@
+.env
+newman/
+*.postman_environment.local.json
