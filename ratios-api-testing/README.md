@@ -4,31 +4,18 @@ Setup + tooling for testing the Ratios API ahead of building automation for user
 client sync, client creation, task creation, etc. Start with **`TESTING_PLAN.md`** for the
 full plan and rationale; this file is just the "how to run it" instructions.
 
+This toolkit is **Postman-only** by design — one place to install, one collection encoding
+every confirmed request/response assumption, nothing to keep in sync across two tools.
+
 ## Prerequisites
 
 - A Ratios test/service account with the `API-adgang` role assigned by an admin.
-- Ideally a **sandbox tenant** — ask Ratios before running any write tests against a real one.
-- Postman (desktop app or web) for exploratory testing.
-- Python 3.10+ for the automated test suite.
+- Ideally a **sandbox tenant** — ask Ratios before running any write requests against a real one.
+- Postman (desktop app or web).
+- (Optional, for CI) Node.js + [Newman](https://www.npmjs.com/package/newman) to run the
+  collection headlessly.
 
-## 1. Shared configuration (`.env`)
-
-Both Postman and Python setups read from the same values. Start here:
-
-```bash
-cd ratios-api-testing
-cp .env.example .env
-```
-
-Fill in `.env` with:
-- `RATIOS_API_KEY` — the public `apikey` header value from the Authentication docs.
-- `RATIOS_EMAIL` / `RATIOS_PASSWORD` — your dedicated test account.
-- `RATIOS_TENANT_ID` — leave blank at first; get it by authenticating once and calling
-  `GET /functions/v1/api/tenants` (Postman's "List Tenants" request does this for you).
-
-`.env` is git-ignored — never commit it.
-
-## 2. Postman setup
+## 1. Import & configure
 
 1. Open Postman → **Import** → select both files in `postman/`:
    - `Ratios_API.postman_collection.json`
@@ -36,16 +23,45 @@ Fill in `.env` with:
 2. Select the **"Ratios API - Sandbox"** environment (top-right environment picker).
 3. Fill in the environment's secret values (`apikey`, `email`, `password`) directly in Postman
    — don't paste them into the collection itself, and don't commit an environment export that
-   has real values filled in.
+   has real values filled in. `.env.example` in this folder documents the same values, useful as
+   a reference and for Newman's `--env-var` flags (see §4).
 4. Run **01 - Authentication → Get JWT Token**. Its Tests script writes `access_token`/
    `refresh_token` into the environment automatically; every other request in the collection
    uses `{{access_token}}` via the collection-level Bearer auth, so no manual copying is needed.
 5. Run **01 - Authentication → List Tenants** and copy the right `tenant_id` into the
    environment.
-6. Work through the folders in order (`02 - Clients`, `03 - Tasks`, `04 - Users`,
-   `05 - Partner OAuth2`) per `TESTING_PLAN.md`.
 
-**Headless/CI runs** (optional, once the collection is stable):
+## 2. Run order
+
+- **`00 - Smoke Test (core happy path)`** — run this first, and any time you want a fast "is
+  auth + the API still behaving" check. It creates a client, updates it, creates a linked project
+  (standing in for a "client workspace" — see the request description), creates and updates a
+  task, then deletes everything it created. Fully self-contained; safe to re-run repeatedly.
+- **`01 - Authentication`** — connectivity/auth checks, including negative cases (wrong password,
+  missing `apikey` header, foreign `tenant_id`).
+- **`02 - Clients`**, **`03 - Tasks`**, **`04 - Users (Profiles)`** — CRUD per resource, each
+  including a validation-error case (e.g. missing required field).
+- **`03b - Pagination & Filtering Edge Cases`** — one request per filter operator plus pagination
+  boundary cases (default/max/over-max `per_page`, page past the end, ordering, field selection).
+  Best run as a batch via **Collection Runner** (see below).
+- **`05 - Partner OAuth2 (optional)`** — only relevant if/when the Partner OAuth2 model is the
+  chosen integration approach (see `TESTING_PLAN.md` §8).
+- **`06 - Sync Patterns`** — a self-looping pagination-walk request (pages through *all* `clients`
+  using `pm.execution.setNextRequest`), an incremental-sync example filtered on `updated_at`, and
+  the rate-limit probe procedure (read its description before running).
+- **`99 - Cleanup`** — run after an interrupted run, or periodically; lists any leftover records
+  matching `{{test_prefix}}` so they can be deleted.
+
+## 3. Using the Collection Runner
+
+For anything meant to run as a batch (the `03b` edge-case folder, the pagination-walk request,
+the rate-limit probe): open **Collection Runner**, pick the folder (or the whole collection),
+select the **Ratios API - Sandbox** environment, and run. For the rate-limit probe specifically,
+set an explicit inter-request delay (e.g. 250ms) and a small iteration count (e.g. 20) — see the
+request description in `06 - Sync Patterns` for the full procedure.
+
+## 4. Headless / CI runs with Newman
+
 ```bash
 npm install -g newman
 newman run postman/Ratios_API.postman_collection.json \
@@ -56,63 +72,36 @@ newman run postman/Ratios_API.postman_collection.json \
   --env-var tenant_id=$RATIOS_TENANT_ID
 ```
 
-## 3. Python setup
+Run just the `00 - Smoke Test` folder as a fast scheduled health check:
 
 ```bash
-cd ratios-api-testing
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+newman run postman/Ratios_API.postman_collection.json \
+  -e postman/Ratios_API.postman_environment.json \
+  --folder "00 - Smoke Test (core happy path)" \
+  --env-var apikey=$RATIOS_API_KEY --env-var email=$RATIOS_EMAIL \
+  --env-var password=$RATIOS_PASSWORD --env-var tenant_id=$RATIOS_TENANT_ID
 ```
 
-Run the test suite (reads `.env` from the folder above via `python-dotenv`):
+Keep real secrets out of source control — pass them as CI secret-store environment variables
+(as above via `--env-var`), never committed into the environment JSON.
 
-```bash
-cd python
-pytest -v                     # everything, including tests that pre-check env vars and skip if unset
-pytest -v -m "not writes"     # read-only smoke tests only -- safe to run anytime
-pytest -v -m writes           # data-creating tests -- run deliberately, sandbox only
-```
-
-Tests are skipped automatically (not failed) if required `.env` values are missing, so it's
-safe to run `pytest` before configuration is complete.
-
-### Reference automation prototypes
-
-`scripts/` contains standalone examples for the Phase 4 use cases, built on the same
-`RatiosClient`:
-
-```bash
-python scripts/sync_clients_example.py                    # full client sync
-python scripts/sync_clients_example.py --since 2026-01-01 # incremental sync
-python scripts/create_task_example.py --client-id <uuid> --title "Review uploaded documents"
-```
-
-These are starting points for the real integration code, not finished production scripts —
-add logging, error alerting, and idempotency checks (per `TESTING_PLAN.md` §4) before
-scheduling them for real.
-
-## 4. Folder layout
+## 5. Folder layout
 
 ```
 ratios-api-testing/
 ├── TESTING_PLAN.md          # full test plan (read this first)
 ├── README.md                # this file
-├── .env.example              # copy to .env, fill in, never commit .env
-├── requirements.txt
-├── postman/
-│   ├── Ratios_API.postman_collection.json
-│   └── Ratios_API.postman_environment.json
-├── python/
-│   ├── ratios_client.py      # shared API client (auth, CRUD, pagination)
-│   ├── conftest.py           # pytest fixtures (client, cleanup, test_prefix)
-│   ├── pytest.ini
-│   ├── test_auth.py          # Phase 0
-│   ├── test_clients.py       # Phase 2
-│   ├── test_tasks.py         # Phase 2
-│   ├── test_users.py         # Phase 2
-│   └── test_pagination_filtering.py  # Phase 3
-└── scripts/
-    ├── sync_clients_example.py   # Phase 4 prototype
-    └── create_task_example.py    # Phase 4 prototype
+├── .env.example              # reference list of required config/secrets
+├── .gitignore
+└── postman/
+    ├── Ratios_API.postman_collection.json
+    └── Ratios_API.postman_environment.json
 ```
+
+## 6. A note on production automation
+
+This toolkit is for **testing and confirming API behavior**, not for the production sync jobs
+themselves. Once the phases in `TESTING_PLAN.md` are worked through and the open questions
+(§1) are resolved, the actual client sync / user sync / task creation automation is a separate
+build — in whatever language/runtime fits your infrastructure — informed by what gets confirmed
+here (real field names, pagination behavior, dedup semantics, rate limits, etc).

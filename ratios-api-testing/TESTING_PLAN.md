@@ -3,12 +3,11 @@
 Purpose: validate the Ratios REST API for a **filesharing/client-portal integration** that will
 lean heavily on automation — user sync, client sync, client creation, task creation, and
 ongoing two-way sync. This plan covers what to test, in what order, and what to set up locally
-(Postman + Python) to test it safely.
+(Postman) to test it safely.
 
 Companion files in this folder:
-- `postman/` — Postman collection + environment
-- `python/` — reusable API client + pytest test suite
-- `README.md` — setup instructions for both
+- `postman/` — Postman collection + environment (the toolkit's single source of truth — see §5)
+- `README.md` — setup instructions
 
 ---
 
@@ -196,59 +195,86 @@ These are scripted, end-to-end flows mirroring what production automation will d
 
 ## 5. Tooling to set up locally
 
-### Postman
-- Use it for **exploratory/manual** testing during Phase 0–3 (discovering real field shapes,
-  poking at edge cases) and as living documentation of confirmed request/response shapes.
+**Postman is the only tool this toolkit uses** — one place where request/response assumptions
+are encoded, one thing to install, nothing to keep in sync across two implementations. Use it
+for both exploratory/manual testing and as the repeatable, re-runnable test suite.
+
 - Collection + environment provided in `postman/`. Environment variables: `base_url`, `apikey`,
-  `tenant_id`, `email`, `password`, `access_token`, `refresh_token`.
+  `tenant_id`, `email`, `password`, `access_token`, `refresh_token`, `test_prefix`, plus
+  scratch variables used by specific requests (`smoke_client_id`, `sync_page`, `last_sync_at`, etc).
 - The login request's **Tests** tab auto-writes `access_token`/`refresh_token` into the active
   environment, so subsequent requests just work — no manual copy/paste of tokens.
-- For CI, the same collection can be run headlessly with **Newman**
-  (`newman run postman/Ratios_API.postman_collection.json -e postman/Ratios_API.postman_environment.json`)
-  once secrets are supplied via `--env-var` or a CI-only environment file.
+- **Collection structure** (see `README.md` for the full run guide):
+  - `00 - Smoke Test` — fast end-to-end happy path (create client → update → create workspace →
+    create task → update → cleanup). Run this first, and re-run it any time you need a quick
+    "is auth + the API still behaving" check.
+  - `01 - Authentication` — Phase 0 smoke tests, including negative cases (wrong password,
+    missing `apikey`, foreign `tenant_id`).
+  - `02 - Clients`, `03 - Tasks`, `04 - Users (Profiles)` — Phase 2 CRUD, each including a
+    negative/validation-error case.
+  - `03b - Pagination & Filtering Edge Cases` — Phase 3, one request per filter operator plus
+    pagination boundary cases.
+  - `05 - Partner OAuth2 (optional)` — Phase 6.
+  - `06 - Sync Patterns` — Phase 4/7 prototypes: a self-looping pagination-walk request (uses
+    `pm.execution.setNextRequest` to page through all `clients`), an incremental-sync example
+    filtered on `updated_at`, and the rate-limit probe procedure (documented, not auto-run — see
+    the request description).
+  - `99 - Cleanup` — finds any test data a crashed run left behind, by `test_prefix`.
+- Every request that creates data has a matching assertion (`pm.test()`) and, where applicable,
+  a paired delete step, so the collection itself is the record of confirmed behavior — not just
+  a manual click-through.
+- **Collection Runner** is how you get "run the whole thing" repeatability: select a folder (or
+  the whole collection), pick the "Ratios API - Sandbox" environment, and run. Use it for the
+  `03b` edge-case folder, the `06 - Sync Patterns` pagination walk, and the rate-limit probe
+  (with an explicit inter-request delay).
+- For CI, the same collection runs headlessly with **Newman**:
+  ```bash
+  newman run postman/Ratios_API.postman_collection.json \
+    -e postman/Ratios_API.postman_environment.json \
+    --env-var apikey=$RATIOS_API_KEY \
+    --env-var email=$RATIOS_EMAIL \
+    --env-var password=$RATIOS_PASSWORD \
+    --env-var tenant_id=$RATIOS_TENANT_ID
+  ```
+  Run just `00 - Smoke Test` as a fast scheduled health check, or the full collection for deeper
+  regression coverage — see `README.md`.
 
-### Python
-- Use it for the **repeatable, scripted** test suite (Phases 0–5) and as the basis for the actual
-  production sync scripts later — testing and production automation should share the same client
-  library so what you validate in tests is what runs in prod.
-- `python/ratios_client.py` — small `requests`-based client: handles the `apikey`/`Authorization`
-  headers, login, generic CRUD, and a `paginate()` generator that walks all pages of a resource.
-- `python/test_*.py` — `pytest` suite covering Phases 0–3 with real assertions; data-creating
-  tests clean up after themselves (soft-delete what they created).
-- See `README.md` in this folder for exact setup commands (venv, `pip install -r requirements.txt`,
-  `.env`, running `pytest`).
-
-### Best practices applied in both
-- Config via environment variables / `.env`, never hardcoded — same test code runs against
-  sandbox or prod tenant by swapping `.env`.
-- All test-created records use a recognizable naming prefix (`ZZ_QA_` / `pytest-<uuid>`) so they
-  can be found and purged even if a test crashes before cleanup runs.
+### Best practices applied throughout the collection
+- Secrets live in the Postman **Environment** (typed as `secret`, masked and excluded from
+  collection shares/exports), never hardcoded into requests — the same environment file works
+  against sandbox or prod by swapping variable values.
+- All test-created records use a recognizable naming prefix (`{{test_prefix}}`, default `ZZ_QA_`)
+  so they can be found and purged even if a run crashes before its cleanup step (`99 - Cleanup`).
 - Assert on **status code + response shape**, not just "did it 200" — catches silent schema drift.
 - Treat `DELETE` responses as soft-delete verification, not just "no error" — assert the expected
-  visibility behavior once Phase 1 confirms it.
-- Keep write-tests (`POST`/`PATCH`/`DELETE`) clearly separated (folder/marker) from read-only
-  tests, so read-only smoke tests can run frequently/safely (e.g. in CI on a schedule) without
-  risk of mutating tenant data, while write tests are run deliberately against the sandbox only.
+  visibility behavior once Phase 1 confirms it (flagged in the `Delete Client` request description).
+- Keep write requests (`POST`/`PATCH`/`DELETE`) in clearly separated folders from read-only ones,
+  so read-only smoke checks can run frequently/safely (e.g. `00 - Smoke Test` on a schedule)
+  without surprise mutation, while broader write coverage is run deliberately against the sandbox.
 
 ## 6. Suggested execution order
 
-1. Manual pass in Postman through Phase 0 and Phase 1 for `clients`, `profiles`, `tasks` — get
-   real field shapes and error formats, resolve open questions #3, #5, #7 empirically.
-2. Encode confirmed behavior into the Python client (`ratios_client.py`) and pytest suite.
-3. Run Phase 2–3 pytest suite against the sandbox tenant; fix client/tests as real behavior
-   diverges from docs.
-4. Write and run the Phase 4 use-case scripts (`scripts/` — client sync, user sync, task
-   creation) — these double as prototypes for the production automation.
-5. Phase 5 resilience tests once the happy paths are solid.
-6. Phase 6 only if/when the Partner OAuth2 model is confirmed as the integration approach (§8).
-7. Phase 7 before go-live, at realistic data volume.
+1. Run `01 - Authentication` and `00 - Smoke Test` first to confirm auth, tenant scoping, and the
+   core happy path work end to end.
+2. Manual pass through `02 - Clients`, `03 - Tasks`, `04 - Users` to resolve open questions #3,
+   #5, #7 empirically (Phase 1 resource discovery) — update request bodies/assertions as real
+   field shapes and error formats come back different from the docs.
+3. Run `03b - Pagination & Filtering Edge Cases` via Collection Runner against the sandbox tenant.
+4. Exercise `06 - Sync Patterns` (pagination walk + incremental sync) — these double as the
+   reference pattern for whatever language the production automation ends up using.
+5. Phase 5 resilience checks (401/403/404/422, retry safety) once the happy paths are solid —
+   add requests to `01 - Authentication`/relevant folders as new cases are identified.
+6. `05 - Partner OAuth2` only if/when that model is confirmed as the integration approach (§8).
+7. Phase 7 non-functional checks before go-live, at realistic data volume.
+8. Run `99 - Cleanup` after any interrupted run, or periodically.
 
 ## 7. Rate limit discovery (since undocumented)
 
-Run a small controlled burst (e.g. 20 requests in 5 seconds against a cheap `GET` endpoint) from
-the Python suite and log status codes + any `Retry-After`/`X-RateLimit-*` headers. Do this against
-the sandbox, not production, and stop immediately if you see `429`s or errors — report findings
-back into this doc and to Ratios support rather than guessing.
+Use the `Rate limit probe` request in `06 - Sync Patterns` via Collection Runner (small iteration
+count, explicit inter-request delay) against the **sandbox tenant only**, watching for `429`s or
+`Retry-After`/`X-RateLimit-*` headers in the Runner results — see the request's description for
+the exact procedure. Stop immediately if you see errors, and report findings back into this doc
+and to Ratios support rather than guessing.
 
 ## 8. Per-user JWT vs. Partner OAuth2 — decide before building production sync
 

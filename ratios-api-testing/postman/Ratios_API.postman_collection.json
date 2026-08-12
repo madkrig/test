@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ratios API",
-    "description": "Manual/exploratory + smoke test collection for the Ratios API. Pairs with TESTING_PLAN.md. Uses the 'Ratios API - Sandbox' environment for all variables/secrets.",
+    "description": "Postman-only testing toolkit for the Ratios API. Pairs with TESTING_PLAN.md. Run '00 - Smoke Test' for a fast health check, or the full collection via Collection Runner for deeper coverage. Uses the 'Ratios API - Sandbox' environment for all variables/secrets.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -20,6 +20,252 @@
     }
   ],
   "item": [
+    {
+      "name": "00 - Smoke Test (core happy path)",
+      "description": "Fast end-to-end health check covering the most common real-world flow: create client -> update client -> create client workspace -> create task -> update task -> cleanup. Run this whenever you need a quick 'is auth + the API still behaving' check (e.g. after a token refresh, or as a Newman CI health check) without running the full edge-case suite. Self-contained: cleans up everything it creates.",
+      "item": [
+        {
+          "name": "1. Create client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('response has an id', () => pm.expect(record.id).to.be.a('string'));",
+                  "if (record.id) pm.environment.set('smoke_client_id', record.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"{{test_prefix}}Smoke Test Company ApS\",\n  \"email\": \"qa-smoke-client@example.com\",\n  \"city\": \"København\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "2. Update client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('city was updated', () => pm.expect(record.city).to.eql('Aarhus'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Aarhus\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients/{{smoke_client_id}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients", "{{smoke_client_id}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "3. Create client workspace (project)",
+          "description": "Ratios has no resource literally named 'workspace' in the docs -- 'projects' (Projekter), a project record linked to a client, is the closest match and is what this step targets. Confirm with Ratios/the team if 'client workspace' is meant to be something else (e.g. a client group or statusliste).",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('response has an id', () => pm.expect(record.id).to.be.a('string'));",
+                  "if (record.id) pm.environment.set('smoke_project_id', record.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{test_prefix}}Smoke Test Workspace\",\n  \"client_id\": \"{{smoke_client_id}}\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/projects?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "projects"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "4. Create task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('response has an id', () => pm.expect(record.id).to.be.a('string'));",
+                  "if (record.id) pm.environment.set('smoke_task_id', record.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{test_prefix}}Smoke Test Task\",\n  \"client_id\": \"{{smoke_client_id}}\",\n  \"project_id\": \"{{smoke_project_id}}\",\n  \"deadline\": \"2026-09-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "5. Update task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('title was updated', () => pm.expect(record.title).to.eql(pm.environment.get('test_prefix') + 'Smoke Test Task (updated)'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{test_prefix}}Smoke Test Task (updated)\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks/{{smoke_task_id}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks", "{{smoke_task_id}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "6. Cleanup - delete task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks/{{smoke_task_id}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks", "{{smoke_task_id}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "7. Cleanup - delete client workspace (project)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/projects/{{smoke_project_id}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "projects", "{{smoke_project_id}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "8. Cleanup - delete client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients/{{smoke_client_id}}?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients", "{{smoke_client_id}}"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "01 - Authentication",
       "item": [
@@ -101,7 +347,11 @@
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const json = pm.response.json();",
-                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));"
+                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));",
+                  "pm.test('configured tenant_id is among memberships', () => {",
+                  "  const ids = json.data.map(t => t.tenant_id);",
+                  "  pm.expect(ids).to.include(pm.environment.get('tenant_id'));",
+                  "});"
                 ]
               }
             }
@@ -115,6 +365,57 @@
               "path": ["functions", "v1", "api", "tenants"]
             }
           }
+        },
+        {
+          "name": "List Clients - missing apikey header (expect 401/403)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.request.headers.remove('apikey');"]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('is rejected (401/403)', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "List Clients - foreign tenant_id (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 403', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id=00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [{ "key": "tenant_id", "value": "00000000-0000-0000-0000-000000000000" }]
+            }
+          }
         }
       ]
     },
@@ -123,6 +424,20 @@
       "item": [
         {
           "name": "List Clients (paginate + filter + order example)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));",
+                  "pm.test('pagination object present', () => pm.expect(json.pagination).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -177,7 +492,42 @@
           }
         },
         {
+          "name": "Create Client - missing required field (expect 4xx)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('is rejected (4xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
           "name": "Get Client by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -191,6 +541,20 @@
         },
         {
           "name": "Update Client (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('city was updated', () => pm.expect(record.city).to.eql('Aarhus'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "header": [
@@ -211,6 +575,16 @@
         },
         {
           "name": "Delete Client (soft delete)",
+          "description": "After deletion, confirm the follow-up GET behavior (404 vs. 200-with-deleted-flag) against TESTING_PLAN.md open question #5 and adjust the assertion below once confirmed.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -229,6 +603,19 @@
       "item": [
         {
           "name": "List Task Statuses (lookup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -242,6 +629,20 @@
         },
         {
           "name": "List Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));",
+                  "pm.test('pagination object present', () => pm.expect(json.pagination).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -292,7 +693,50 @@
           }
         },
         {
+          "name": "Create Task - invalid client_id (expect 4xx)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('is rejected (4xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{test_prefix}}Orphan Task\",\n  \"client_id\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
           "name": "Update Task (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "pm.test('title was updated', () => pm.expect(record.title).to.eql(pm.environment.get('test_prefix') + 'Test Task (updated)'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "header": [
@@ -313,6 +757,15 @@
         },
         {
           "name": "Delete Task (soft delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -327,10 +780,392 @@
       ]
     },
     {
+      "name": "03b - Pagination & Filtering Edge Cases",
+      "item": [
+        {
+          "name": "Default per_page (<= 50)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('at most 50 records', () => pm.expect(json.data.length).to.be.at.most(50));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "per_page=200 (max, should succeed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('at most 200 records', () => pm.expect(json.data.length).to.be.at.most(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&per_page=200",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "per_page", "value": "200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "per_page=201 (above max - confirm clamp vs. reject)",
+          "description": "Docs say max per_page is 200 but don't say what happens above it. This request documents whichever behavior is observed -- update the test assertion once confirmed: either the response is clamped to <=200 records, or the API returns a 4xx.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 400) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('clamped to at most 200 records', () => pm.expect(json.data.length).to.be.at.most(200));",
+                  "} else {",
+                  "  pm.test('rejected with 4xx', () => pm.expect(pm.response.code).to.be.within(400, 499));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&per_page=201",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "per_page", "value": "201" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "page beyond last (expect empty data, not an error)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('data is empty', () => pm.expect(json.data).to.eql([]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&page=999999&per_page=50",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "page", "value": "999999" },
+                { "key": "per_page", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "order_by company_name asc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const names = json.data.map(r => r.company_name).filter(n => n !== undefined && n !== null);",
+                  "const sorted = [...names].sort();",
+                  "pm.test('results are sorted ascending', () => pm.expect(names).to.eql(sorted));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&order_by=company_name&order_dir=asc&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "order_by", "value": "company_name" },
+                { "key": "order_dir", "value": "asc" },
+                { "key": "per_page", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "order_by company_name desc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const names = json.data.map(r => r.company_name).filter(n => n !== undefined && n !== null);",
+                  "const sorted = [...names].sort().reverse();",
+                  "pm.test('results are sorted descending', () => pm.expect(names).to.eql(sorted));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&order_by=company_name&order_dir=desc&per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "order_by", "value": "company_name" },
+                { "key": "order_dir", "value": "desc" },
+                { "key": "per_page", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "select limits returned fields",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const allowed = ['id', 'company_name'];",
+                  "const onlyAllowedFields = json.data.every(r => Object.keys(r).every(k => allowed.includes(k)));",
+                  "pm.test('only requested fields are returned', () => pm.expect(onlyAllowedFields).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&select=id,company_name&per_page=5",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "select", "value": "id,company_name" },
+                { "key": "per_page", "value": "5" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: eq",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('all rows match city', () => pm.expect(json.data.every(r => r.city === 'København')).to.be.true);"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.city=eq.København&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.city", "value": "eq.København" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: neq",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('no row has excluded city', () => pm.expect(json.data.every(r => r.city !== 'København')).to.be.true);"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.city=neq.København&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.city", "value": "neq.København" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: gte/lte (date range)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/invoices?tenant_id={{tenant_id}}&filter.billing_date=gte.2025-01-01&filter.billing_date=lte.2025-12-31&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "invoices"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.billing_date", "value": "gte.2025-01-01" },
+                { "key": "filter.billing_date", "value": "lte.2025-12-31" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: gt/lt (numeric)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/time_reg?tenant_id={{tenant_id}}&filter.hours=gt.0&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "time_reg"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.hours", "value": "gt.0" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: like (case-sensitive)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.company_name=like.%25ApS&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.company_name", "value": "like.%25ApS" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: ilike (case-insensitive)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.company_name=ilike.%25aps&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.company_name", "value": "ilike.%25aps" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: is.null",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('all rows have null/empty email', () => pm.expect(json.data.every(r => !r.email)).to.be.true);"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.email=is.null&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.email", "value": "is.null" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "filter operator: in",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.test('all rows have an allowed status', () => pm.expect(json.data.every(r => ['draft', 'sent'].includes(r.status))).to.be.true);"] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/invoices?tenant_id={{tenant_id}}&filter.status=in.draft,sent&per_page=10",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "invoices"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.status", "value": "in.draft,sent" },
+                { "key": "per_page", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "04 - Users (Profiles)",
       "item": [
         {
           "name": "List Profiles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('no ssn-like field present', () => {",
+                  "  const hasSsn = json.data.some(r => Object.keys(r).some(k => k.toLowerCase().includes('ssn')));",
+                  "  pm.expect(hasSsn).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "apikey", "value": "{{apikey}}" }],
@@ -348,6 +1183,21 @@
         },
         {
           "name": "Create User (profiles/create-user) - admin/owner only",
+          "description": "send_welcome_email is deliberately false so test runs never email a real inbox.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const json = pm.response.json();",
+                  "const record = json.data || json;",
+                  "if (record.id) pm.environment.set('profile_id_created', record.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -357,6 +1207,35 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"qa-test-user@example.com\",\n  \"first_name\": \"{{test_prefix}}QA\",\n  \"last_name\": \"Test\",\n  \"role\": \"member\",\n  \"send_welcome_email\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/profiles/create-user?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "profiles", "create-user"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Create User - missing email (expect 4xx)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('is rejected (4xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{apikey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"{{test_prefix}}QA\",\n  \"last_name\": \"Test\",\n  \"role\": \"member\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/functions/v1/api/profiles/create-user?tenant_id={{tenant_id}}",
@@ -449,6 +1328,219 @@
               "raw": "{{base_url}}/functions/v1/partner-token-exchange",
               "host": ["{{base_url}}"],
               "path": ["functions", "v1", "partner-token-exchange"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Sync Patterns",
+      "item": [
+        {
+          "name": "Pagination walk - all clients (run via Collection Runner)",
+          "description": "Postman-native replacement for a 'walk every page' sync loop. Self-loops via pm.execution.setNextRequest until a page comes back empty, accumulating sync_total_count. Run this single request directly (it re-queues itself) or include it in a Collection Runner pass. Uses per_page=200 (the documented max) to minimize round-trips.",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('sync_page')) pm.environment.set('sync_page', '1');",
+                  "if (pm.environment.get('sync_page') === '1') pm.environment.set('sync_total_count', '0');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const records = json.data || [];",
+                  "let total = parseInt(pm.environment.get('sync_total_count') || '0', 10);",
+                  "total += records.length;",
+                  "pm.environment.set('sync_total_count', String(total));",
+                  "",
+                  "if (records.length > 0) {",
+                  "  const nextPage = parseInt(pm.environment.get('sync_page') || '1', 10) + 1;",
+                  "  pm.environment.set('sync_page', String(nextPage));",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  console.log(`Pagination walk complete. Total client records: ${total}`);",
+                  "  pm.environment.set('sync_page', '1');",
+                  "  pm.execution.setNextRequest(null);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&page={{sync_page}}&per_page=200",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "page", "value": "{{sync_page}}" },
+                { "key": "per_page", "value": "200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Incremental sync - clients updated since last_sync_at",
+          "description": "Pattern for polling-based incremental sync. `updated_at` is assumed based on common convention -- confirm the real field name empirically (TESTING_PLAN.md open question #5 / Phase 1) and adjust the filter.* param name here if different. Set last_sync_at in the environment to your last successful sync timestamp.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('data is array', () => pm.expect(json.data).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.updated_at=gte.{{last_sync_at}}&order_by=updated_at&order_dir=asc&per_page=200",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.updated_at", "value": "gte.{{last_sync_at}}" },
+                { "key": "order_by", "value": "updated_at" },
+                { "key": "order_dir", "value": "asc" },
+                { "key": "per_page", "value": "200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rate limit probe - read this before running",
+          "description": "Not a scripted burst -- Postman's per-request scripting isn't a great fit for a tight timed loop, and an uncontrolled burst against production is exactly what we want to avoid. To probe for rate limits: point this request's environment at the SANDBOX tenant only, then use Collection Runner with an explicit inter-request delay (e.g. Runner 'Delay' setting, 250ms) and a set iteration count (e.g. 20), watching for 429 responses or X-RateLimit-*/Retry-After headers in the Runner results. Record findings back into TESTING_PLAN.md section 7. This request body is a harmless read (GET /api/tenants) suitable for that Runner pass.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log('status:', pm.response.code, 'retry-after:', pm.response.headers.get('Retry-After'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tenants",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tenants"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "99 - Cleanup",
+      "description": "Run after a full Collection Runner pass, or periodically, to find any test data left behind by a crashed/interrupted run (the smoke test and per-folder CRUD requests clean up after themselves on the happy path, but a failed assertion mid-run can skip a later Delete step).",
+      "item": [
+        {
+          "name": "Find leftover test clients (by prefix)",
+          "description": "Lists any client whose company_name starts with the configured test_prefix. Review the results, then delete each via '02 - Clients > Delete Client (soft delete)' with client_id_created set to the id in question, or via the Ratios UI.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('Leftover test clients:', json.data.map(r => ({ id: r.id, company_name: r.company_name })));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/clients?tenant_id={{tenant_id}}&filter.company_name=ilike.{{test_prefix}}%25&per_page=200",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "clients"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.company_name", "value": "ilike.{{test_prefix}}%25" },
+                { "key": "per_page", "value": "200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find leftover test tasks (by prefix)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('Leftover test tasks:', json.data.map(r => ({ id: r.id, title: r.title })));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/tasks?tenant_id={{tenant_id}}&filter.title=ilike.{{test_prefix}}%25&per_page=200",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "tasks"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.title", "value": "ilike.{{test_prefix}}%25" },
+                { "key": "per_page", "value": "200" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find leftover test workspaces/projects (by prefix)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "console.log('Leftover test projects:', json.data.map(r => ({ id: r.id, title: r.title })));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{apikey}}" }],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/api/projects?tenant_id={{tenant_id}}&filter.title=ilike.{{test_prefix}}%25&per_page=200",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "api", "projects"],
+              "query": [
+                { "key": "tenant_id", "value": "{{tenant_id}}" },
+                { "key": "filter.title", "value": "ilike.{{test_prefix}}%25" },
+                { "key": "per_page", "value": "200" }
+              ]
             }
           }
         }
