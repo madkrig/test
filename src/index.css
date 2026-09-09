@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Cedra brand palette — deep cedar teal + warm gold accent */
+  --color-cedra-950: #06211c;
+  --color-cedra-900: #0a2e27;
+  --color-cedra-800: #0e4237;
+  --color-cedra-700: #135b4b;
+  --color-cedra-600: #17715d;
+  --color-cedra-500: #1c8b72;
+  --color-cedra-400: #3aa88d;
+  --color-cedra-300: #7ec9b6;
+  --color-cedra-200: #b7e2d6;
+  --color-cedra-100: #dcf0ea;
+  --color-cedra-50: #f2faf7;
+
+  --color-gold-600: #a3791f;
+  --color-gold-500: #c9992e;
+  --color-gold-400: #dcb35a;
+  --color-gold-100: #f7ecd4;
+
+  --color-status-critical: #d64545;
+  --color-status-action: #e08a2c;
+  --color-status-pending: #7fb4d8;
+  --color-status-done: #1c5f8b;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cedra-50);
+  color: #16211d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-cedra-200);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
