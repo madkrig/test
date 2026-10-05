@@ -4,3 +4,7 @@ dist/
 coverage/
 *.db
 *.db-journal
+test.db*
+.env
+next-env.d.ts
+*.tsbuildinfo

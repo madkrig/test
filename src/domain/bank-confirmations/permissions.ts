@@ -34,6 +34,7 @@ const PERMISSIONS: Record<Role, readonly Action[]> = {
   METHOD_QUALITY: [],
   // Administrator styrer integrationer – ikke kundeindhold eller faglig godkendelse.
   SYSTEM_ADMIN: ['MANAGE_INTEGRATIONS'],
+  SYSTEM: ['ACTIVATE_SUBTASK', 'RUN_COMPLETENESS_CONTROL', 'SEND_REMINDER'],
 };
 
 export function can(role: Role, action: Action): boolean {

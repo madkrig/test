@@ -13,7 +13,15 @@ export interface BankConfirmationConfig {
     escalationWorkdaysBeforeDeadline: number; // T-10 arbejdsdage før faglig deadline
     nonWorkdayPolicy: NonWorkdayPolicy;
   };
-  reminders: { maxStandardReminders: number };
+  reminders: {
+    maxStandardReminders: number;
+    /** Arbejdsdage mellem påmindelse 1 og 2. */
+    intervalWorkdays: number;
+  };
+  /** Arbejdsdage fra i dag til særskilt udsendelsesfrist for en delta-bank. */
+  deltaLeadWorkdays: number;
+  /** Arbejdsdage revisor har til en beslutning ved manglende svar. */
+  decisionWorkdays: number;
   completenessControl: {
     statementTypes: readonly string[];
     /** Hvor mange måneder frem fra kørselsdatoen statusdatoer medtages. */
@@ -40,7 +48,9 @@ export const DEFAULT_CONFIG: BankConfirmationConfig = {
     escalationWorkdaysBeforeDeadline: 10,
     nonWorkdayPolicy: 'previous',
   },
-  reminders: { maxStandardReminders: 2 },
+  reminders: { maxStandardReminders: 2, intervalWorkdays: 5 },
+  deltaLeadWorkdays: 5,
+  decisionWorkdays: 5,
   completenessControl: {
     statementTypes: ['REVISION', 'UDVIDET_GENNEMGANG'],
     lookaheadMonths: 3,

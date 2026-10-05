@@ -27,6 +27,26 @@ function milestone(rule: string, ruleDate: IsoDate, calendar: WorkdayCalendar, c
 }
 
 /**
+ * Påmindelsesdatoer efter bankmetoden: bankens forventede svartid tælles i
+ * arbejdsdage efter statusdato (se docs/antagelser.md #4). Påmindelse 2 følger
+ * efter det konfigurerede interval.
+ */
+export function reminderSchedule(
+  statusDate: IsoDate,
+  expectedResponseWorkdays: number,
+  calendar: WorkdayCalendar,
+  config: BankConfirmationConfig = DEFAULT_CONFIG,
+): IsoDate[] {
+  const dates: IsoDate[] = [];
+  let next = addWorkdays(statusDate, expectedResponseWorkdays, calendar);
+  for (let i = 0; i < config.reminders.maxStandardReminders; i += 1) {
+    dates.push(next);
+    next = addWorkdays(next, config.reminders.intervalWorkdays, calendar);
+  }
+  return dates;
+}
+
+/**
  * Tidsstyret proces (brief afsnit 6). To tidsakser:
  * statusdato driver T-2/T-6/T-5/T-4; den faglige deadline driver T-10 arbejdsdage.
  */

@@ -3,7 +3,8 @@ import type { BankTaskStatus, SubtaskStatus } from './statuses';
 
 /** Domæneobjekter (brief afsnit 5). Alle data i prototypen er syntetiske. */
 
-export type Role = 'AUDITOR' | 'KERNE' | 'SERVICE_OWNER' | 'METHOD_QUALITY' | 'SYSTEM_ADMIN';
+/** SYSTEM = workflowmotor/planlagte jobs (T-2-aktivering, påmindelser, månedlig kontrol). */
+export type Role = 'AUDITOR' | 'KERNE' | 'SERVICE_OWNER' | 'METHOD_QUALITY' | 'SYSTEM_ADMIN' | 'SYSTEM';
 
 export interface User {
   id: string;

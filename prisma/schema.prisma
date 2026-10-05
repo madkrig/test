@@ -1,0 +1,301 @@
+// Datamodel for bankbekræftelser (brief afsnit 5). Syntetiske data.
+// SQLite har ikke enums/arrays: statusser er strenge (valideret i domænelaget),
+// lister gemmes som JSON-tekst eller i koblingstabeller.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id   String @id
+  name String
+  role String // AUDITOR | KERNE | SERVICE_OWNER | METHOD_QUALITY | SYSTEM_ADMIN | SYSTEM
+}
+
+model Customer {
+  id                   String       @id
+  name                 String
+  cvr                  String
+  active               Boolean
+  responsibleAuditorId String
+  contactPerson        String
+  groupReference       String?
+  hasHistory           Boolean      @default(false)
+  engagements          Engagement[]
+}
+
+model Engagement {
+  id                   String     @id
+  customerId           String
+  customer             Customer   @relation(fields: [customerId], references: [id])
+  legalEntity          String
+  statementType        String
+  periodStart          String
+  periodEnd            String
+  statusDate           String
+  active               Boolean
+  responsibleAuditorId String
+  team                 String     @default("[]") // JSON string[]
+  professionalDeadline String
+  subtasks             Subtask[]
+}
+
+model Subtask {
+  id                     String              @id
+  engagementId           String
+  engagement             Engagement          @relation(fields: [engagementId], references: [id])
+  procedureType          String              @default("BANK_CONFIRMATIONS")
+  periodEnd              String
+  activationSource       String
+  status                 String
+  active                 Boolean             @default(true)
+  nextAction             String
+  nextOwner              String
+  openQuestions          Int                 @default(0)
+  openReviewNotes        Int                 @default(0)
+  professionalConclusion String?
+  conclusionBy           String?
+  conclusionAt           String?
+  createdAt              String
+  updatedAt              String
+  versions               PopulationVersion[]
+  bankTasks              BankTask[]
+  decisions              Decision[]
+}
+
+model PopulationVersion {
+  id               String           @id
+  subtaskId        String
+  subtask          Subtask          @relation(fields: [subtaskId], references: [id])
+  version          Int
+  kind             String // FULL | DELTA
+  baseVersionId    String?
+  status           String // DRAFT | SUBMITTED | APPROVED | REJECTED
+  approvedBy       String?
+  approvedAt       String?
+  approvalSnapshot String? // JSON af det grundlag, revisor så ved godkendelsen
+  rejectionReason  String?
+  createdAt        String
+  items            PopulationItem[]
+
+  @@unique([subtaskId, version])
+}
+
+model PopulationItem {
+  id                String            @id
+  versionId         String
+  version           PopulationVersion @relation(fields: [versionId], references: [id])
+  bankId            String
+  bankName          String
+  relationType      String
+  change            String // PROPOSED | ADDED | CHANGED | REMOVED | UNCHANGED
+  sources           String            @default("[]") // JSON PopulationSource[]
+  priorYearRelation Boolean           @default(false)
+  customerConfirmed Boolean           @default(false)
+  auditorDecision   String?
+  removalReason     String?
+  bankTaskId        String?
+}
+
+model Bank {
+  id      String              @id
+  name    String
+  country String
+  methods BankMethodVersion[]
+}
+
+model BankMethodVersion {
+  id                       String  @id
+  bankId                   String
+  bank                     Bank    @relation(fields: [bankId], references: [id])
+  version                  Int
+  channel                  String // PLATFORM | UPLOAD_PORTAL | EMAIL | OTHER
+  urlOrChannel             String
+  requiredFields           String  @default("[]")
+  authorizationRequirement String // GENERAL | BANK_SPECIFIC
+  expectedResponseWorkdays Int
+  reminderMethod           String
+  escalationContact        String
+  validFrom                String
+  status                   String // DRAFT | ACTIVE | RETIRED
+  owner                    String
+  lastReviewed             String?
+  changeReason             String
+  newOrChanged             Boolean @default(false)
+  createdBy                String
+  approvedBy               String?
+  approvedAt               String?
+
+  @@unique([bankId, version])
+}
+
+model BankTask {
+  id                          String          @id
+  subtaskId                   String
+  subtask                     Subtask         @relation(fields: [subtaskId], references: [id])
+  engagementId                String
+  customerId                  String
+  bankId                      String
+  populationItemId            String
+  status                      String
+  methodVersionId             String
+  kerneOwnerId                String?
+  sendDate                    String
+  sentAt                      String?
+  nextReminderDate            String?
+  reminderCount               Int             @default(0)
+  responseId                  String?
+  administrativeCheckPassed   Boolean         @default(false)
+  fourEyesCompleted           Boolean         @default(false)
+  fourEyesReviewerId          String?
+  changedAfterApproval        Boolean         @default(false)
+  openProfessionalDecision    Boolean         @default(false)
+  flagBlocked                 Boolean         @default(false)
+  flagDeadlineExceeded        Boolean         @default(false)
+  flagMissingAuthorization    Boolean         @default(true)
+  flagException               Boolean         @default(false)
+  flagProfessionalAction      Boolean         @default(false)
+  flagFourEyesRequired        Boolean         @default(false)
+  blockedReason               String?
+  nextAction                  String
+  nextOwner                   String
+  createdAt                   String
+  updatedAt                   String
+  coverage                    AuthorizationCoverage[]
+  response                    BankResponse?
+
+  @@unique([subtaskId, bankId])
+}
+
+model Authorization {
+  id               String                  @id
+  customerId       String
+  signer           String
+  validFrom        String
+  validTo          String
+  bankRequirement  String?
+  status           String // MISSING | REQUESTED | RECEIVED | VALID | UNCERTAIN | EXPIRED
+  atypical         Boolean                 @default(false)
+  obtainedAt       String?
+  validationResult String?
+  kerneDocumentRef String?
+  coverage         AuthorizationCoverage[]
+}
+
+model AuthorizationCoverage {
+  authorizationId String
+  authorization   Authorization @relation(fields: [authorizationId], references: [id])
+  bankTaskId      String
+  bankTask        BankTask      @relation(fields: [bankTaskId], references: [id])
+
+  @@id([authorizationId, bankTaskId])
+}
+
+model BankResponse {
+  id                        String   @id
+  bankTaskId                String   @unique
+  bankTask                  BankTask @relation(fields: [bankTaskId], references: [id])
+  receivedAt                String
+  channel                   String
+  originalFileName          String
+  metadata                  String   @default("{}")
+  administrativeCheckStatus String // PENDING | PASSED | FAILED
+  checks                    String   @default("{}")
+  deviations                String   @default("[]")
+  sharePointDocumentId      String?
+  sharePointUrl             String?
+  integrityHash             String?
+}
+
+model Decision {
+  id          String  @id
+  subtaskId   String
+  subtask     Subtask @relation(fields: [subtaskId], references: [id])
+  bankTaskId  String?
+  type        String // MISSING_RESPONSE | EXCEPTION | DELTA_APPROVAL
+  question    String
+  options     String  @default("[]") // JSON {id,label}[]
+  evidence    String  @default("{}")
+  status      String // OPEN | DECIDED
+  ownerId     String
+  deadline    String?
+  chosenOption String?
+  reason      String?
+  followUpOwnerId String?
+  followUpDeadline String?
+  decidedBy   String?
+  decidedAt   String?
+  createdAt   String
+}
+
+model CompletenessRun {
+  id             String             @id
+  runDate        String
+  windowEnd      String
+  populationSize Int
+  inWindow       Int
+  withSubtask    Int
+  createdBy      String
+  createdAt      String
+  items          CompletenessItem[]
+}
+
+model CompletenessItem {
+  id                   String          @id
+  runId                String
+  run                  CompletenessRun @relation(fields: [runId], references: [id])
+  engagementId         String
+  customerId           String
+  responsibleAuditorId String
+  reason               String
+  decision             String // OPEN | OPT_IN | OPT_OUT
+  optOutReason         String?
+  decidedBy            String?
+  decidedAt            String?
+  deadline             String
+}
+
+/// Append-only hændelseslog. Applikationslaget opretter kun, aldrig update/delete.
+model Event {
+  id         String  @id
+  objectType String
+  objectId   String
+  subtaskId  String?
+  action     String
+  actorId    String
+  at         String
+  change     String?
+  reason     String?
+}
+
+model Notification {
+  id        String  @id
+  recipient String // bruger-id eller rolle (fx "ROLE:KERNE")
+  type      String
+  message   String
+  link      String
+  createdAt String
+  readAt    String?
+}
+
+model IdempotencyKey {
+  key       String @id
+  operation String
+  response  String
+  createdAt String
+}
+
+/// Simulerede integrationskald (AuditFlow/SharePoint) til demo og test.
+model IntegrationCall {
+  id        String  @id
+  system    String
+  operation String
+  payload   String
+  ok        Boolean
+  at        String
+}

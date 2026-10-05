@@ -31,6 +31,8 @@ export const SUBTASK_TRANSITIONS: TransitionMap<SubtaskStatus> = {
   INITIATED_KERNE: { AWAITING_AUDITOR: 'Populationen er klar til godkendelse' },
   AWAITING_AUDITOR: {
     AWAITING_KERNE: 'Revisor har godkendt populationen eller truffet faglig beslutning',
+    AWAITING_BANK: 'Faglig beslutning er truffet; banker afventer fortsat svar',
+    RECEIVED: 'Faglig beslutning er truffet; svar afventer administrativ kontrol',
     INITIATED_KERNE: 'Revisor har returneret populationen',
   },
   AWAITING_KERNE: {
@@ -39,10 +41,13 @@ export const SUBTASK_TRANSITIONS: TransitionMap<SubtaskStatus> = {
     COMPLETED: 'Alle afslutningskontroller er opfyldt',
   },
   AWAITING_BANK: {
-    RECEIVED: 'Alle banker har en endelig status',
+    RECEIVED: 'Alle afsendte banker har svaret',
     AWAITING_AUDITOR: 'Manglende svar eller undtagelse kræver faglig beslutning',
   },
-  RECEIVED: { AWAITING_AUDITOR: 'Reviewpakken er klar' },
+  RECEIVED: {
+    AWAITING_AUDITOR: 'Reviewpakken er klar eller en undtagelse kræver revisor',
+    AWAITING_BANK: 'En ny bank (delta) er sendt og afventer svar',
+  },
   COMPLETED: {},
 };
 
@@ -50,6 +55,7 @@ export const BANK_TASK_TRANSITIONS: TransitionMap<BankTaskStatus> = {
   AWAITING_KERNE: {
     AWAITING_BANK: 'Anmodningen er afsendt efter bankmetoden',
     COMPLETED: 'Faglig beslutning om alternativ håndtering er truffet og kontrollerne er opfyldt',
+    AWAITING_AUDITOR: 'Kerne har eskaleret en undtagelse, fx uklar tegningsret',
   },
   AWAITING_BANK: {
     RECEIVED: 'Banksvaret er modtaget',
@@ -59,7 +65,10 @@ export const BANK_TASK_TRANSITIONS: TransitionMap<BankTaskStatus> = {
     AWAITING_AUDITOR: 'Administrativ kontrol har fundet en faglig undtagelse',
     COMPLETED: 'Administrativ kontrol er bestået og banksvaret er arkiveret',
   },
-  AWAITING_AUDITOR: { AWAITING_KERNE: 'Revisor har truffet beslutning' },
+  AWAITING_AUDITOR: {
+    AWAITING_KERNE: 'Revisor har truffet beslutning',
+    AWAITING_BANK: 'Revisor har besluttet at afvente yderligere svar',
+  },
   COMPLETED: {},
 };
 

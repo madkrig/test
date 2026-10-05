@@ -6,4 +6,5 @@ export * from './entities';
 export * from './permissions';
 export * from './rules';
 export * from './statuses';
+export * from './subtask';
 export * from './timeline';
