@@ -1,0 +1,41 @@
+import type { Role } from './entities';
+
+/** Rolle → tilladte handlinger (brief afsnit 4). */
+export type Action =
+  | 'ACTIVATE_SUBTASK'
+  | 'EDIT_POPULATION'
+  | 'PREPARE_POPULATION'
+  | 'APPROVE_POPULATION'
+  | 'BULK_APPROVE'
+  | 'DECIDE_EXCEPTION'
+  | 'RECORD_CONCLUSION'
+  | 'WORK_BANK_TASK'
+  | 'SEND_REQUEST'
+  | 'SEND_REMINDER'
+  | 'REGISTER_RESPONSE'
+  | 'UPLOAD_RESPONSE'
+  | 'ESCALATE'
+  | 'PERFORM_FOUR_EYES'
+  | 'MANAGE_BANK_REGISTER'
+  | 'APPROVE_BANK_METHOD'
+  | 'RUN_COMPLETENESS_CONTROL'
+  | 'MANAGE_INTEGRATIONS';
+
+const PERMISSIONS: Record<Role, readonly Action[]> = {
+  AUDITOR: ['ACTIVATE_SUBTASK', 'EDIT_POPULATION', 'APPROVE_POPULATION', 'BULK_APPROVE', 'DECIDE_EXCEPTION', 'RECORD_CONCLUSION'],
+  KERNE: [
+    'PREPARE_POPULATION', 'WORK_BANK_TASK', 'SEND_REQUEST', 'SEND_REMINDER',
+    'REGISTER_RESPONSE', 'UPLOAD_RESPONSE', 'ESCALATE', 'PERFORM_FOUR_EYES',
+  ],
+  SERVICE_OWNER: [
+    'PREPARE_POPULATION', 'WORK_BANK_TASK', 'PERFORM_FOUR_EYES', 'MANAGE_BANK_REGISTER',
+    'APPROVE_BANK_METHOD', 'RUN_COMPLETENESS_CONTROL',
+  ],
+  METHOD_QUALITY: [],
+  // Administrator styrer integrationer – ikke kundeindhold eller faglig godkendelse.
+  SYSTEM_ADMIN: ['MANAGE_INTEGRATIONS'],
+};
+
+export function can(role: Role, action: Action): boolean {
+  return PERMISSIONS[role].includes(action);
+}
