@@ -1,0 +1,119 @@
+// Datamodel for e-signering via Penneo. Syntetiske data.
+// SQLite har ikke enums: statusser er strenge (valideret i domænelaget).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id    String @id
+  name  String
+  email String
+  role  String // AUDITOR | SYSTEM
+}
+
+model Client {
+  id                   String          @id
+  name                 String
+  cvr                  String
+  responsibleAuditorId String
+  signingPersons       SigningPerson[]
+  signingRequests      SigningRequest[]
+}
+
+/// Kundens tegningsberettigede/underskrivere, som de står i stamdata.
+model SigningPerson {
+  id       String  @id
+  clientId String
+  client   Client  @relation(fields: [clientId], references: [id])
+  name     String
+  email    String?
+  role     String // DIRECTOR | CHAIR | BOARD_MEMBER
+  active   Boolean @default(true)
+}
+
+/// Én underskriftsopgave = én Penneo-sag (case file) med ét dokument.
+model SigningRequest {
+  id                   String                 @id
+  clientId             String
+  client               Client                 @relation(fields: [clientId], references: [id])
+  serviceType          String // ANNUAL_REPORT | MANAGEMENT_REPRESENTATION | AUDIT_PROTOCOL
+  documentTitle        String
+  fileName             String
+  message              String
+  status               String // AWAITING_SIGNATURES | SIGNED | COMPLETED | REJECTED
+  requestedById        String
+  penneoCaseFileId     Int?
+  penneoDocumentId     Int?
+  penneoStatus         Int? // Penneo case file status (0-5)
+  archiveFailed        Boolean                @default(false)
+  sharePointDocumentId String?
+  sharePointUrl        String?
+  integrityHash        String?
+  nextAction           String
+  nextOwner            String
+  createdAt            String
+  updatedAt            String
+  completedAt          String?
+  signers              SigningRequestSigner[]
+}
+
+/// Øjebliksbillede af underskriveren på oprettelsestidspunktet.
+model SigningRequestSigner {
+  id             String         @id
+  requestId      String
+  request        SigningRequest @relation(fields: [requestId], references: [id])
+  personId       String
+  name           String
+  email          String
+  role           String
+  sortOrder      Int
+  penneoSignerId Int?
+  status         String // PENDING | SIGNED | REJECTED
+  signedAt       String?
+}
+
+/// Append-only hændelseslog. Applikationslaget opretter kun, aldrig update/delete.
+model Event {
+  id         String  @id
+  objectType String
+  objectId   String
+  requestId  String?
+  action     String
+  actorId    String
+  at         String
+  change     String?
+  reason     String?
+}
+
+model Notification {
+  id        String  @id
+  recipient String
+  type      String
+  message   String
+  link      String
+  createdAt String
+  readAt    String?
+}
+
+model IdempotencyKey {
+  key       String @id
+  operation String
+  response  String
+  createdAt String
+}
+
+/// Simulerede integrationskald (Penneo/SharePoint) til demo og test.
+model IntegrationCall {
+  id        String  @id
+  system    String
+  operation String
+  payload   String
+  ok        Boolean
+  at        String
+}
