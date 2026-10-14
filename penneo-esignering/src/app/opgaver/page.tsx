@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useCallback, useEffect, useState } from 'react';
+import { E_SIGNING_WORKFLOW, workflowProgress } from '@/domain/e-signing';
 import type { SigningRequestView } from '@/services/signing-service';
 import { StatusPill } from '../_components/StatusPill';
+import { WorkflowDiagram } from '../_components/WorkflowDiagram';
 import { api, errorBody, formatDateTime, type ApiErrorBody } from '../_lib/api';
 
 type Scope = 'active' | 'completed' | 'all';
@@ -32,6 +34,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 function RequestDetail({ id, demo, onChanged }: { id: string; demo: boolean; onChanged: () => void }) {
+  const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<ApiErrorBody | null>(null);
@@ -60,67 +63,76 @@ function RequestDetail({ id, demo, onChanged }: { id: string; demo: boolean; onC
   if (!detail) return <p className="progress" role="status">Henter …</p>;
   const r = detail.data;
   return (
-    <div className="detail-grid">
-      <div>
-        <h3>Underskrivere</h3>
-        <ul className="signer-list">
-          {r.signers.map((s) => (
-            <li key={s.id}>
-              <span className="who">{s.name}<small>{s.roleLabel} · {s.email}</small></span>
-              {s.status === 'SIGNED' ? (
-                <span className="tag ok">Underskrevet {formatDateTime(s.signedAt)}</span>
-              ) : s.status === 'PENDING' && r.status === 'AWAITING_SIGNATURES' && demo ? (
-                <button
-                  className="secondary small"
-                  disabled={busy !== null}
-                  onClick={() => run(s.id, () => api('/api/demo/penneo/sign', { method: 'POST', body: { requestId: r.id, signerId: s.id } }))}
-                  title="Demo: spiller Penneos rolle og sender de webhooks, Penneo ville sende"
-                >
-                  {busy === s.id ? 'Underskriver …' : 'Simulér underskrift (demo)'}
+    <>
+      <h3>Hvor er forløbet nu</h3>
+      <WorkflowDiagram
+        workflow={E_SIGNING_WORKFLOW}
+        progress={workflowProgress(r.status, r.archiveFailed)}
+        onSelect={(key) => router.push(`/forloeb?step=${key}#step-${key}`)}
+        label={`Forløb for ${r.documentTitle}: ${r.statusLabel}`}
+      />
+      <div className="detail-grid">
+        <div>
+          <h3>Underskrivere</h3>
+          <ul className="signer-list">
+            {r.signers.map((s) => (
+              <li key={s.id}>
+                <span className="who">{s.name}<small>{s.roleLabel} · {s.email}</small></span>
+                {s.status === 'SIGNED' ? (
+                  <span className="tag ok">Underskrevet {formatDateTime(s.signedAt)}</span>
+                ) : s.status === 'PENDING' && r.status === 'AWAITING_SIGNATURES' && demo ? (
+                  <button
+                    className="secondary small"
+                    disabled={busy !== null}
+                    onClick={() => run(s.id, () => api('/api/demo/penneo/sign', { method: 'POST', body: { requestId: r.id, signerId: s.id } }))}
+                    title="Demo: spiller Penneos rolle og sender de webhooks, Penneo ville sende"
+                  >
+                    {busy === s.id ? 'Underskriver …' : 'Simulér underskrift (demo)'}
+                  </button>
+                ) : (
+                  <span className="tag waiting">{s.statusLabel}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {r.archiveFailed && (
+            <div className="error">
+              <strong>Dokumentet er underskrevet, men ikke arkiveret i SharePoint.</strong>
+              <div className="error-actions">
+                <button className="small" disabled={busy !== null} onClick={() => run('archive', () => api(`/api/signing-requests/${r.id}/archive`, { method: 'POST' }))}>
+                  {busy === 'archive' ? 'Arkiverer …' : 'Prøv arkivering igen'}
                 </button>
-              ) : (
-                <span className="tag waiting">{s.statusLabel}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-        {r.archiveFailed && (
-          <div className="error">
-            <strong>Dokumentet er underskrevet, men ikke arkiveret i SharePoint.</strong>
-            <div className="error-actions">
-              <button className="small" disabled={busy !== null} onClick={() => run('archive', () => api(`/api/signing-requests/${r.id}/archive`, { method: 'POST' }))}>
-                {busy === 'archive' ? 'Arkiverer …' : 'Prøv arkivering igen'}
-              </button>
+              </div>
             </div>
-          </div>
-        )}
-        {r.sharePoint && (
-          <p className="help">Arkiveret i SharePoint: <a href={r.sharePoint.url} target="_blank" rel="noreferrer">{r.fileName.replace(/\.pdf$/i, '')}_underskrevet.pdf</a></p>
-        )}
-        <details>
-          <summary>Identifikation</summary>
-          <dl>
-            <dt>Penneo-sag</dt><dd>#{r.penneo.caseFileId}{r.penneo.statusLabel && ` · ${r.penneo.statusLabel}`}</dd>
-            <dt>Fil</dt><dd>{r.fileName}</dd>
-            {r.sharePoint && <><dt>SharePoint-dokument</dt><dd>{r.sharePoint.documentId}</dd><dt>Integritetshash</dt><dd>{r.sharePoint.integrityHash}</dd></>}
-            <dt>Opgave</dt><dd>{r.id}</dd>
-          </dl>
-        </details>
-        {error && <div className="error" role="alert"><strong>{error.message}</strong>{error.recovery && <div>{error.recovery}</div>}</div>}
+          )}
+          {r.sharePoint && (
+            <p className="help">Arkiveret i SharePoint: <a href={r.sharePoint.url} target="_blank" rel="noreferrer">{r.fileName.replace(/\.pdf$/i, '')}_underskrevet.pdf</a></p>
+          )}
+          <details>
+            <summary>Identifikation</summary>
+            <dl>
+              <dt>Penneo-sag</dt><dd>#{r.penneo.caseFileId}{r.penneo.statusLabel && ` · ${r.penneo.statusLabel}`}</dd>
+              <dt>Fil</dt><dd>{r.fileName}</dd>
+              {r.sharePoint && <><dt>SharePoint-dokument</dt><dd>{r.sharePoint.documentId}</dd><dt>Integritetshash</dt><dd>{r.sharePoint.integrityHash}</dd></>}
+              <dt>Opgave</dt><dd>{r.id}</dd>
+            </dl>
+          </details>
+          {error && <div className="error" role="alert"><strong>{error.message}</strong>{error.recovery && <div>{error.recovery}</div>}</div>}
+        </div>
+        <div>
+          <h3>Hændelseslog</h3>
+          <ol className="timeline">
+            {detail.events.map((e) => (
+              <li key={e.id}>
+                <b>{EVENT_LABELS[e.action] ?? e.action}</b>{e.change && ` – ${e.change}`}
+                {e.reason && <div>{e.reason}</div>}
+                <small>{formatDateTime(e.at)} · {e.actorId === 'system' ? 'System (Penneo-webhook)' : e.actorName}</small>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
-      <div>
-        <h3>Hændelseslog</h3>
-        <ol className="timeline">
-          {detail.events.map((e) => (
-            <li key={e.id}>
-              <b>{EVENT_LABELS[e.action] ?? e.action}</b>{e.change && ` – ${e.change}`}
-              {e.reason && <div>{e.reason}</div>}
-              <small>{formatDateTime(e.at)} · {e.actorId === 'system' ? 'System (Penneo-webhook)' : e.actorName}</small>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
+    </>
   );
 }
 

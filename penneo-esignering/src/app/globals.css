@@ -289,6 +289,74 @@ details dl { margin: 14px 0 0; }
 .dialog-main .actions { margin: 0; padding: 18px 34px 22px; background: #fff; }
 .close { width: 34px; height: 34px; padding: 0; justify-content: center; font-size: 18px; line-height: 1; }
 
+/* Forløbsdiagram: trin (HTML) oven på kanter (SVG) i en vandret scrollbar flade */
+.wf-scroll { overflow-x: auto; overflow-y: hidden; margin: 22px 0 0; border: 1px solid #e4ebe5; border-radius: 7px; background: #fbfcfb; contain: inline-size; }
+.wf-canvas { position: relative; }
+.wf-edges { position: absolute; inset: 0; overflow: visible; }
+.wf-edges path { fill: none; stroke: #a9bab3; stroke-width: 1.5; }
+.wf-edges path.active { stroke: var(--primary); stroke-width: 2; }
+.wf-edges .wf-arrow { fill: #a9bab3; stroke: none; }
+.wf-edges .wf-arrow.active { fill: var(--primary); }
+.wf-start { fill: var(--ink); }
+.wf-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--td-text);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.wf-label.active { border-color: #9cc5b5; color: var(--primary); font-weight: 600; }
+.wf-node, .wf-node:hover {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: #fff;
+  color: #4f6960;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  text-align: left;
+  font-weight: 400;
+}
+.wf-node:hover { border-color: var(--secondary-border); box-shadow: 0 2px 10px #163b400d; }
+.wf-node.auto { background: #eef3f0; border-color: #eef3f0; }
+.wf-node.integration { border-style: dashed; border-color: #a7c2b4; }
+.wf-node.end { border-radius: 999px; justify-content: center; }
+.wf-node.end.ok { color: var(--ok-text); }
+.wf-node.end.failed { color: var(--err-text); }
+.wf-node svg { flex: none; }
+.wf-text { min-width: 0; }
+.wf-text strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wf-text small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wf-node.selected { outline: 2px solid #6faa91; outline-offset: 2px; }
+.wf-node.current { border: 2px solid var(--primary); box-shadow: 0 0 0 4px var(--soft-active); color: var(--primary); }
+.wf-node.done { color: var(--ok-text); }
+.wf-node.dim { opacity: 0.5; }
+.wf-now { position: absolute; top: -10px; right: 10px; background: var(--primary); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; }
+
+/* Trin-tabel */
+.wf-steps tr { scroll-margin-top: 110px; }
+.wf-steps .wf-num { width: 36px; color: var(--text-muted); }
+.wf-step { display: flex; gap: 12px; align-items: flex-start; }
+.wf-step .tag { margin-left: 8px; vertical-align: 1px; }
+.wf-icon { width: 34px; height: 34px; flex: none; border-radius: 8px; border: 1px solid var(--card-border); background: #fff; color: #4f6960; display: grid; place-items: center; }
+.wf-icon.auto { background: #eef3f0; border-color: #eef3f0; }
+.wf-icon.integration { border-style: dashed; border-color: #a7c2b4; }
+.wf-icon.end.ok { color: var(--ok-text); }
+.wf-icon.end.failed { color: var(--err-text); }
+.wf-line { display: block; margin-top: 3px; }
+.wf-route { display: block; }
+.wf-route + .wf-route { margin-top: 8px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; color: var(--th-text); }
+.tag.start { background: var(--soft-active); color: #16483d; }
+
 @media (max-width: 1000px) {
   .layout { grid-template-columns: 220px minmax(0, 1fr); gap: 28px; padding: 30px 24px; }
   .app-header { padding: 0 24px; }
@@ -313,7 +381,7 @@ details dl { margin: 14px 0 0; }
   aside { padding: 0; }
   aside > p, aside h1, .aside-note { display: none; }
   .side-nav { display: flex; margin: 0 0 24px; gap: 5px; }
-  .side-nav a { flex: 1; justify-content: center; padding: 10px 0; }
+  .side-nav a { flex: 1; justify-content: center; padding: 10px 2px; gap: 8px; font-size: 12px; }
   section.card { padding: 22px 18px; }
   .grid, .stats, .stats.four { grid-template-columns: 1fr 1fr; }
   .grid { grid-template-columns: 1fr; }
@@ -333,6 +401,7 @@ details dl { margin: 14px 0 0; }
   table.stack tr.detail { padding: 0; }
   table.stack tr.detail > td { padding: 4px 14px 18px; }
   .signer-list li { flex-wrap: wrap; }
+  .wf-steps .wf-num { display: none; }
   .steps button { font-size: 0; }
   .steps b { font-size: 12px; }
   .backdrop { padding: 0; place-items: stretch; }

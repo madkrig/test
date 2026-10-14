@@ -4,7 +4,7 @@ Brug dette brief, når en ny feature skal se ud og opføre sig som **Cedra Stikp
 
 - **Kilde:** `frontend/src/style.css` i [madkrig/cedra-stikproeveberegner](https://github.com/madkrig/cedra-stikproeveberegner) (branch `codex/stikproeveberegner-mvp`).
 - **Referenceimplementering:** [`src/app/globals.css`](../src/app/globals.css) i dette projekt. Filen er selvstændig (ingen Tailwind, ingen UI-bibliotek) og kan kopieres direkte.
-- **Eksempler i koden:** ramme i [`AppShell.tsx`](../src/app/_components/AppShell.tsx), guide i [`PenneoSigningModal.tsx`](../src/app/_components/PenneoSigningModal.tsx), oversigt i [`opgaver/page.tsx`](../src/app/opgaver/page.tsx), katalog i [`markedsplads/page.tsx`](../src/app/markedsplads/page.tsx).
+- **Eksempler i koden:** ramme i [`AppShell.tsx`](../src/app/_components/AppShell.tsx), guide i [`PenneoSigningModal.tsx`](../src/app/_components/PenneoSigningModal.tsx), oversigt i [`opgaver/page.tsx`](../src/app/opgaver/page.tsx), katalog i [`markedsplads/page.tsx`](../src/app/markedsplads/page.tsx), forløbsdiagram i [`WorkflowDiagram.tsx`](../src/app/_components/WorkflowDiagram.tsx) og [`forloeb/page.tsx`](../src/app/forloeb/page.tsx).
 - **Skærmbilleder:** [`docs/screenshots/`](screenshots/).
 
 ---
@@ -132,6 +132,8 @@ Afstande: kortet har padding 34px (25px under 1000px, 22/18px under 750px). Felt
 | Arbejder | `.progress[role=status]` | "Arbejder …", "Sender til Penneo …" |
 | Liste med status | `ul.signer-list > li > .who + .tag/knap` | Person eller post til venstre, status eller handling til højre |
 | Katalogkort | `.catalog > article.offer` (`.muted` = ikke tilgængelig) | Eyebrow-kategori, `h3`, `p`, fod med handling |
+| Forløbsdiagram | `<WorkflowDiagram>` (`.wf-scroll > .wf-canvas`) | Tegnes ud fra trin og ruter; vandret scroll. Grå flade = automatisk, stiplet = integration, hvid = person. Udfald i piller på kanterne. Se [forloebsdiagram.md](forloebsdiagram.md) |
+| Trin-tabel | `<WorkflowSteps>` (`table.stack.wf-steps`) | # · Trin (ikon, navn, `nøgle` · type) · Hvem (+ frister) · Ruter (`udfald` → trin). Rækker har `id="step-<nøgle>"` |
 
 ### Markup – felt, upload og handlingslinje
 
@@ -195,6 +197,8 @@ Afstande: kortet har padding 34px (25px under 1000px, 22/18px under 750px). Felt
 **Fejl fra serveren.** Vis `message`, `reasons` som punktliste og `recovery` som sidste linje i `.error`. API'et returnerer `{ error: { code, message, reasons?, owner?, recovery? } }`, og UI'et viser teksterne uden at omformulere dem.
 
 **Tom tilstand.** `.empty` med én sætning og et link til stedet, hvor man starter ("Start et e-signeringsforløb fra Markedspladsen").
+
+**Forløb.** Et forløb vises som diagram i ét kort og trin-tabel i det næste. Klik i diagram eller tabel markerer trinnet begge steder og opdaterer `?step=<nøgle>#step-<nøgle>`. For et konkret forløb (fx i Opgaver) fremhæves det aktuelle trin med "Her nu", vejen dertil er grøn, og trin, der ikke er nået, dæmpes.
 
 ---
 
@@ -269,7 +273,7 @@ Sidenavigation med 3 punkter eller færre beholder teksten på mobil. Trin i en 
 | Læg id'er, hash og versioner i `details` | Vis tekniske id'er som hovedindhold |
 | Lad API'ets `recovery` stå som sidste linje i fejlen | Generiske fejl som "Noget gik galt" |
 | Tabeller med `table.stack` + `data-label` | Tabeller, der klippes eller scroller vandret på mobil |
-| Ikoner sparsomt (🔔, ✓, ×) | Ikonbiblioteker, illustrationer, animationer |
+| Ikoner sparsomt: 🔔, ✓, × og trintype-ikonerne i `StepIcon.tsx` | Ikonbiblioteker, illustrationer, animationer |
 
 ---
 
@@ -282,7 +286,7 @@ Sidenavigation med 3 punkter eller færre beholder teksten på mobil. Trin i en 
 - [ ] Blokeringer i `.notice`; serverfejl i `.error` med årsager og recovery.
 - [ ] Status som `.tag` med tekst; "afventer hvem" vist.
 - [ ] Teknik i `details`; opsummering i `dl` før uigenkaldelige handlinger.
-- [ ] Ingen nye farver uden token; ingen inline-stile ud over den beregnede bredde på `.bar`.
+- [ ] Ingen nye farver uden token; ingen inline-stile ud over beregnede mål (bredden på `.bar`, positioner i forløbsdiagrammet).
 - [ ] Testet ved 1440px og 390px uden vandret scroll; dialog og tabeller fungerer på mobil.
 - [ ] Fokusring synlig; `role="alert"`/`role="status"` og `aria-label` på ikonknapper.
 - [ ] Dansk tekst, datoer `dd.mm.åååå`, ingen påstande om godkendelse eller compliance.

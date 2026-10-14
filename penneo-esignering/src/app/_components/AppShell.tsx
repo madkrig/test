@@ -65,6 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const nav = [
     { href: '/markedsplads', label: 'Markedsplads', mark: '+' },
     { href: '/opgaver', label: 'Opgaver', mark: active === null ? '–' : String(active) },
+    { href: '/forloeb', label: 'Forløb', mark: '→' },
   ];
 
   return (

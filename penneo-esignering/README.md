@@ -39,6 +39,14 @@ Brugerfladen følger det visuelle sprog fra [Cedra Stikprøveberegner](https://g
 
 ![Opgaver: fuldført og arkiveret i SharePoint](docs/screenshots/5-opgaver-fuldfoert.png)
 
+### Forløbsdiagram
+
+**Forløb** tegner e-signeringsforløbet ud fra trin og ruter, og **Opgaver** viser, hvor hvert forløb står nu. Se [docs/forloebsdiagram.md](docs/forloebsdiagram.md).
+
+| Forløb | Opgaver: hvor er forløbet nu |
+|---|---|
+| ![Forløb](docs/screenshots/6-forloeb.png) | ![Opgaver med forløb](docs/screenshots/7-opgaver-forloeb.png) |
+
 ## Kom i gang
 
 ```bash
@@ -83,7 +91,8 @@ src/domain/e-signing/        rene funktioner: statusser, ydelseskatalog, undersk
 src/services/                use cases: igangsætning, webhooks, arkivering, notifikationer, eventlog, idempotens
 src/services/adapters/       Penneo, SharePoint og notifikationer (mocks bag interfaces)
 src/app/api/**               tynde route handlers (Zod-validering → service)
-src/app/markedsplads, opgaver  skærmene
+src/lib/workflow/            forløbsdiagram: typer og layoutmotor (ren funktion, testet)
+src/app/markedsplads, opgaver, forloeb  skærmene
 prisma/schema.prisma         datamodel
 tests/unit, tests/integration  domænetests og API-flows via de rigtige route handlers
 docs/                        Penneo-integration, API, antagelser
@@ -93,6 +102,7 @@ docs/                        Penneo-integration, API, antagelser
 - **API:** [docs/api.md](docs/api.md).
 - **Antagelser og begrænsninger:** [docs/antagelser.md](docs/antagelser.md).
 - **Styling:** [docs/STYLING.md](docs/STYLING.md) – stylingbrief, der kan genbruges på andre features.
+- **Forløbsdiagram:** [docs/forloebsdiagram.md](docs/forloebsdiagram.md) – baggrund, valg af løsning, layout og hvordan et nyt forløb beskrives.
 
 ## Hvad er genbrugt fra Bankbekræftelser, og hvad er skåret væk
 
