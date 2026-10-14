@@ -3,6 +3,7 @@ export * as bankConfirmations from './bank-confirmation-service';
 export * as bankRegister from './bank-register-service';
 export * as bankTasks from './bank-task-service';
 export * as completeness from './completeness-service';
+export * as demo from './demo-service';
 export * as reviewer from './reviewer-service';
 export { loadActor } from './access';
 export { prisma } from './db';

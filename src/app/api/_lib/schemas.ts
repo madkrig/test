@@ -64,3 +64,5 @@ export const methodSchema = z.object({
 export const runSchema = z.object({ runDate: isoDate.optional() });
 export const clarificationSchema = z.object({ decision: z.enum(['OPT_IN', 'OPT_OUT']), reason: z.string().optional() });
 export const bulkApproveSchema = z.object({ items: z.array(z.object({ subtaskId: z.string(), versionId: z.string() })).min(1), confirmed: z.boolean() });
+export const demoClockSchema = z.object({ date: isoDate });
+export const demoResetSchema = z.object({ state: z.enum(['start', 'brief']) });

@@ -10,7 +10,7 @@ for (const [path, routes] of byPath) {
   const dir = `src/app/api/${path}`;
   mkdirSync(dir, { recursive: true });
   const schemas = [...new Set(routes.map((r) => r.schema).filter(Boolean))];
-  const services = ['authorizations', 'bankConfirmations', 'bankRegister', 'bankTasks', 'completeness', 'reviewer', 'listEvents', 'prisma'].filter((s) => routes.some((r) => r.call.includes(s)));
+  const services = ['authorizations', 'bankConfirmations', 'bankRegister', 'bankTasks', 'completeness', 'reviewer', 'demo', 'listEvents', 'prisma'].filter((s) => routes.some((r) => r.call.includes(s)));
   const usesParams = routes.some((r) => r.call.includes('params.'));
   const lines = ['// Genereret af scripts/generate-routes.mjs – ret i scripts/routes.spec.json.', "import { handler } from '@/app/api/_lib/handler';"];
   if (schemas.length) lines.push(`import { ${schemas.join(', ')} } from '@/app/api/_lib/schemas';`);

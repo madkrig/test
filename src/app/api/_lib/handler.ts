@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ZodError, type z, type ZodTypeAny } from 'zod';
 import type { User } from '@/domain/bank-confirmations';
 import { DomainError, loadActor, prisma } from '@/services';
+import { syncDemoClock } from '@/services/demo-service';
 
 export interface HandlerContext<B> {
   actor: User;
@@ -42,6 +43,7 @@ export function handler<S extends ZodTypeAny | undefined = undefined>(
 ) {
   return async (req: NextRequest, context: { params: Promise<Record<string, string>> }) => {
     try {
+      await syncDemoClock();
       const actor = await loadActor(prisma, userId(req));
       const params = (await context?.params) ?? {};
       let body: unknown = undefined;

@@ -286,7 +286,7 @@ export async function administrativeCheck(actor: User, id: string, input: Admini
     }
     const deviations = json<string[]>((await tx.bankResponse.findUniqueOrThrow({ where: { id: response.id } })).deviations, []);
     if (deviations.length) {
-      await openDecision(tx, ctx.task, 'EXCEPTION', `Afvigelse i banksvar: ${deviations.join('; ')}. Hvordan skal det håndteres fagligt?`, EXCEPTION_OPTIONS, { deviations, sharePointUrl: (await tx.bankResponse.findUniqueOrThrow({ where: { id: response.id } })).sharePointUrl }, actor.id);
+      await openDecision(tx, ctx.task, 'EXCEPTION', `Afvigelse i banksvar: ${deviations.map((d) => d.replace(/\.+$/, '')).join('; ')}. Hvordan skal det håndteres fagligt?`, EXCEPTION_OPTIONS, { deviations, sharePointUrl: (await tx.bankResponse.findUniqueOrThrow({ where: { id: response.id } })).sharePointUrl }, actor.id);
       await tx.bankTask.update({ where: { id }, data: { flagException: true } });
     }
     return taskResult(tx, id);

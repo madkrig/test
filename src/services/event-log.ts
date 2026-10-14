@@ -1,6 +1,5 @@
 import { now } from './clock';
 import type { Db } from './db';
-import { newId } from './ids';
 
 export interface EventInput {
   objectType: string;
@@ -12,11 +11,15 @@ export interface EventInput {
   reason?: string;
 }
 
+let seq = 0;
+/** Tidssorterbart id, så hændelser med samme tidsstempel bevarer rækkefølgen. */
+const eventId = () => `ev-${Date.now().toString(36)}-${(seq++ % 1679616).toString(36).padStart(4, '0')}`;
+
 /** Append-only: der findes bevidst ingen update/delete-funktion for hændelser. */
 export async function appendEvent(db: Db, input: EventInput) {
   return db.event.create({
     data: {
-      id: newId('ev'),
+      id: eventId(),
       objectType: input.objectType,
       objectId: input.objectId,
       subtaskId: input.subtaskId ?? null,

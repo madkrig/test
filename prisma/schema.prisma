@@ -299,3 +299,9 @@ model IntegrationCall {
   ok        Boolean
   at        String
 }
+
+/// Prototype-indstillinger (fx demodato). Ikke en del af domænet.
+model Setting {
+  key   String @id
+  value String
+}

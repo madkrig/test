@@ -19,8 +19,7 @@ import * as reviewRoute from '@/app/api/review-package/[id]/route';
 import * as deltaRoute from '@/app/api/bank-confirmations/[id]/population/delta/route';
 import * as eventsRoute from '@/app/api/events/route';
 import { prisma } from '@/services';
-import { setClock } from '@/services/clock';
-import { allChecks, call, reseed } from './helpers';
+import { allChecks, call, reseed, travel } from './helpers';
 
 const sofie = 'u-sofie';
 const jonas = 'u-jonas';
@@ -61,7 +60,7 @@ describe('E2E 1 + 5: tilbagevendende kunde med tre banker fra aktivering til rev
     await call(approveRoute, 'POST', '/approve', { user: sofie, params: { id: ids.nordhavn }, body: { versionId: v.id } });
     const [danske, jyske, sydbank] = await tasksOf(ids.nordhavn);
 
-    setClock('2026-12-03');
+    await travel('2026-12-03');
     // Uden autorisation blokeres udsendelse med konkret årsag.
     const blocked = await call(sendRoute, 'POST', '/send', { user: jonas, params: { id: sydbank!.id }, idempotencyKey: 'k0' });
     expect(blocked.status).toBe(409);
@@ -96,7 +95,7 @@ describe('E2E 1 + 5: tilbagevendende kunde med tre banker fra aktivering til rev
     expect(subtaskView.json.subtask.status).toBe('AWAITING_BANK');
     expect(subtaskView.json.summary).toEqual({ banks: 3, sent: 3, received: 0, exceptions: 0 });
 
-    setClock('2027-01-08');
+    await travel('2027-01-08');
     for (const t of [danske!, jyske!, sydbank!]) {
       await call(receiveRoute, 'POST', '/receive', { user: jonas, params: { id: t.id }, idempotencyKey: `r-${t.id}`, body: { channel: 'EMAIL', originalFileName: `${t.bankId}.pdf` } });
       const c = await call(checkRoute, 'POST', '/check', { user: jonas, params: { id: t.id }, idempotencyKey: `c-${t.id}`, body: { checks: allChecks, deviations: [] } });
@@ -176,14 +175,14 @@ describe('E2E 4: manglende svar med to påmindelser og T-10-eskalation', () => {
     expect(sydbank.reminderCount).toBe(1);
     const early = await call(remindRoute, 'POST', '/remind', { user: jonas, params: { id: sydbank.id }, idempotencyKey: 'r2-early' });
     expect(early.json.error.reasons[0]).toMatch(/først sendes 22\.01\.2027/);
-    setClock('2027-01-22');
+    await travel('2027-01-22');
     expect((await call(remindRoute, 'POST', '/remind', { user: jonas, params: { id: sydbank.id }, idempotencyKey: 'r2' })).status).toBe(200);
-    setClock('2027-01-29');
+    await travel('2027-01-29');
     const third = await call(remindRoute, 'POST', '/remind', { user: jonas, params: { id: sydbank.id }, idempotencyKey: 'r3' });
     expect(third.json.error.reasons).toContain('Maksimalt 2 standardpåmindelser. Videre håndtering kræver faglig beslutning.');
     // Før T-10: ingen eskalation.
     expect((await call(escalationRoute, 'POST', '/job', { user: 'system' })).json.data.escalated).toEqual([]);
-    setClock('2027-02-01');
+    await travel('2027-02-01');
     const esc = await call(escalationRoute, 'POST', '/job', { user: 'system' });
     expect(esc.json.data.escalated).toEqual([sydbank.id]);
     expect((await call(escalationRoute, 'POST', '/job', { user: 'system' })).json.data.escalated).toEqual([]);

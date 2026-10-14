@@ -12,8 +12,7 @@ import * as activateMethodRoute from '@/app/api/bank-methods/[id]/activate/route
 import * as banksRoute from '@/app/api/banks/route';
 import { prisma } from '@/services';
 import { setSharePointFailure } from '@/services/adapters';
-import { setClock } from '@/services/clock';
-import { allChecks, call, reseed } from './helpers';
+import { allChecks, call, reseed, travel } from './helpers';
 
 describe('BR-01 dublet', () => {
   it('viser den eksisterende subopgave ved dubletforsøg', async () => {
@@ -41,7 +40,7 @@ describe('population – fjernelse kræver begrundelse', () => {
 describe('SharePoint-integrationsfejl', () => {
   it('gemmer blokeret tilstand med recovery action, og genforsøg lykkes', async () => {
     const ids = await reseed('brief');
-    setClock('2027-01-20');
+    await travel('2027-01-20');
     const sydbank = (await prisma.bankTask.findMany({ where: { subtaskId: ids.nordhavn } })).find((t) => t.bankId === 'sydbank')!;
     const { receive } = await import('@/services/bank-task-service');
     const { loadActor } = await import('@/services/access');

@@ -31,4 +31,11 @@ Briefet (v1.0, 5. oktober 2026) er styrende. Hvor briefet er åbent eller tvetyd
 - **Integrationer er mocks:** AuditFlow, SharePoint og notifikationer simuleres og logges i `IntegrationCall`/`Notification`. SharePoint-fejl kan fremprovokeres i test.
 - **Eventlog:** append-only håndhæves i applikationslaget, ikke i databasen.
 - **Planlagte jobs** (påmindelser, T-10-eskalering, månedlig kontrol) køres via API-kald, ikke en scheduler.
-- **UI** kommer i fase 3; E2E-tests i browser og demo-script i fase 4.
+- **Demoværktøjer:** fælles demodato og nulstilling (`/api/demo/*`) er kun til prototypen og kræver blot en valgt bruger.
+
+## Kendte begrænsninger (fase 3)
+
+- Skærmene er desktop-først (≥ 1100 px); mindre skærme får én kolonne.
+- BankTask-referencer (fx BT-1A2B) er afledt af id'et og ikke et fortløbende nummer.
+- Fire-øjne-reviewer vælger selv, hvem der udførte arbejdet; prototypen har ingen sporing af, hvem der klargjorde e-mailen.
+- Browser-E2E ligger endnu ikke i repoet (fase 4). Fase 3 er verificeret med en manuel Playwright-gennemklikning af hele demo-scriptet.

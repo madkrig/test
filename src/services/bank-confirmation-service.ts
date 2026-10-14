@@ -26,7 +26,7 @@ import { adapters, KERNE_QUEUE } from './adapters';
 import { now, today } from './clock';
 import { prisma, transaction, type Db } from './db';
 import { assertOrThrow, DomainError } from './errors';
-import { appendEvent } from './event-log';
+import { appendEvent, listEvents } from './event-log';
 import { newId } from './ids';
 import { json, toBankTask, toItem, toMethod, toVersion } from './mappers';
 import { calendar, recomputeTask, refreshSubtask, timelineFor } from './state';
@@ -396,14 +396,18 @@ export async function getForEngagement(actor: User, engagementId: string) {
   const engagement = await db.engagement.findUniqueOrThrow({ where: { id: engagementId }, include: { customer: true } });
   const subtask = await db.subtask.findFirst({ where: { engagementId, active: true } });
   const timeline = timelineFor(engagement);
-  if (!subtask) return { engagement, subtask: null, timeline, canActivate: actor.role === 'AUDITOR' };
-  const [population, tasks, decisions] = await Promise.all([
+  const clarification = await db.completenessItem.findFirst({ where: { engagementId }, orderBy: { deadline: 'desc' } });
+  if (!subtask) return { engagement, subtask: null, timeline, clarification, canActivate: actor.role === 'AUDITOR', events: [] };
+  const [population, tasks, decisions, events] = await Promise.all([
     getPopulation(actor, subtask.id),
     bankTaskViews(db, subtask.id),
     db.decision.findMany({ where: { subtaskId: subtask.id }, orderBy: { createdAt: 'asc' } }),
+    listEvents(db, { subtaskId: subtask.id }),
   ]);
   return {
     engagement,
+    clarification,
+    events,
     subtask: { ...subtask, statusLabel: STATUS_LABELS[subtask.status as SubtaskStatus] },
     timeline,
     population,
@@ -416,6 +420,53 @@ export async function getForEngagement(actor: User, engagementId: string) {
     },
     decisions: decisions.map((d) => ({ ...d, options: json(d.options, []), evidence: json(d.evidence, {}) })),
   };
+}
+
+/** Revisorens egne revisionsopgaver med subopgavens status (AuditFlow-forside). */
+export async function myEngagements(actor: User) {
+  const engagements = await prisma.engagement.findMany({ where: { active: true }, include: { customer: true, subtasks: true }, orderBy: { statusDate: 'asc' } });
+  const mine = engagements.filter((e) => actor.role !== 'AUDITOR' || e.responsibleAuditorId === actor.id || json<string[]>(e.team, []).includes(actor.id));
+  const openItems = await prisma.completenessItem.findMany({ where: { decision: 'OPEN', engagementId: { in: mine.map((e) => e.id) } } });
+  return mine.map((e) => {
+    const s = e.subtasks.find((x) => x.active) ?? null;
+    const clarification = openItems.find((i) => i.engagementId === e.id) ?? null;
+    return {
+      engagementId: e.id,
+      customer: e.customer.name,
+      engagement: `${e.statementType === 'REVISION' ? 'Revision' : 'Udvidet gennemgang'} ${e.periodEnd.slice(0, 4)}`,
+      statusDate: e.statusDate,
+      professionalDeadline: e.professionalDeadline,
+      responsibleAuditorId: e.responsibleAuditorId,
+      subtask: s ? { id: s.id, status: s.status, statusLabel: STATUS_LABELS[s.status as SubtaskStatus], nextAction: s.nextAction, nextOwner: s.nextOwner } : null,
+      clarification: clarification ? { id: clarification.id, reason: clarification.reason, deadline: clarification.deadline } : null,
+    };
+  });
+}
+
+/** Kernes populationsarbejde: subopgaver, hvor populationsforslaget skal klargøres eller er returneret. */
+export async function populationWork(actor: User) {
+  await requirePermission(prisma, actor, 'PREPARE_POPULATION');
+  const subtasks = await prisma.subtask.findMany({
+    where: { active: true, status: { not: 'COMPLETED' } },
+    include: { engagement: { include: { customer: true } }, versions: { include: { items: true }, orderBy: { version: 'desc' }, take: 1 } },
+  });
+  return subtasks
+    .filter((s) => s.versions[0] && (s.versions[0].status === 'DRAFT' || s.versions[0].status === 'REJECTED'))
+    .map((s) => {
+      const v = s.versions[0]!;
+      return {
+        subtaskId: s.id,
+        engagementId: s.engagementId,
+        customer: s.engagement.customer.name,
+        version: v.version,
+        versionStatus: v.status,
+        rejectionReason: v.rejectionReason,
+        banks: v.items.filter((i) => i.change !== 'REMOVED').length,
+        nextAction: v.status === 'REJECTED' ? 'Ret population efter revisors bemærkning' : s.nextAction,
+        deadline: timelineFor(s.engagement).populationDeadline.date,
+      };
+    })
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
 }
 
 export async function bankTaskViews(db: Db, subtaskId: string) {

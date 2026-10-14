@@ -4,9 +4,15 @@ import { prisma } from '@/services';
 import { loadActor } from '@/services/access';
 import { setClock } from '@/services/clock';
 
+/** Sætter den fælles demodato (som UI'et gør), så route handlers og services ser samme dag. */
+export async function travel(date: string) {
+  await prisma.setting.upsert({ where: { key: 'demoToday' }, create: { key: 'demoToday', value: date }, update: { value: date } });
+  setClock(date);
+}
+
 export async function reseed(state: SeedState = 'start') {
   const ids = await seed(prisma, state);
-  setClock(state === 'brief' ? '2027-01-15' : '2026-11-12');
+  await travel(state === 'brief' ? '2027-01-15' : '2026-11-12');
   return ids;
 }
 

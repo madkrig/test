@@ -6,6 +6,7 @@ Udsendelse, påmindelse, modtagelse og upload kræver headeren `Idempotency-Key`
 
 | Metode | Sti | Beskrivelse | Body |
 |---|---|---|---|
+| GET | `/api/engagements` | Revisorens egne revisionsopgaver med subopgavestatus | – |
 | GET | `/api/engagements/:id/bank-confirmations` | AuditFlow-visning: subopgave, population, bankopgaver, beslutninger | – |
 | POST | `/api/engagements/:id/bank-confirmations/activate` | Aktivér bankbekræftelser (dublet → 409 med existingId) | `activate` |
 | GET | `/api/bank-confirmations/:id/population` | Populationsversioner; ændringer sorteret først | – |
@@ -19,6 +20,7 @@ Udsendelse, påmindelse, modtagelse og upload kræver headeren `Idempotency-Key`
 | POST | `/api/bank-confirmations/:id/complete` | Kerne fuldfører subopgaven (afslutningsblokering) | – |
 | POST | `/api/bank-confirmations/:id/review-notes/resolve` | Luk én åben review note | – |
 | GET | `/api/review-package/:id` | Beslutningsklar reviewpakke | – |
+| GET | `/api/population-work` | Kernes populationsarbejde: kladder og returnerede versioner | – |
 | GET | `/api/bank-tasks` | Prioriteret arbejdskø (server-side filtrering/pagination) | – |
 | POST | `/api/bank-tasks/assign` | Bulk-tildeling | `assign` |
 | GET | `/api/bank-tasks/:id` | Workbench: opgave, metode, autorisation, svar, log | – |
@@ -47,6 +49,8 @@ Udsendelse, påmindelse, modtagelse og upload kræver headeren `Idempotency-Key`
 | POST | `/api/reviewer/bulk-approve` | Massegodkendelse (separat approval event pr. engagement) | `bulkApprove` |
 | GET | `/api/events` | Uforanderlig hændelseslog | – |
 | GET | `/api/notifications` | Notifikationer for aktuel bruger/rolle | – |
+| POST | `/api/demo/clock` | Sæt fælles demodato (kun prototype) | `demoClock` |
+| POST | `/api/demo/reset` | Nulstil syntetiske demodata til start- eller brief-tilstand (kun prototype) | `demoReset` |
 
 Body-skemaer er defineret med Zod i `src/app/api/_lib/schemas.ts`.
 

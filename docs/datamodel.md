@@ -13,7 +13,7 @@ Customer 1─* Engagement 1─* Subtask 1─* PopulationVersion 1─* Population
                               └─* Decision
 
 CompletenessRun 1─* CompletenessItem      Event (append-only)
-Notification   IdempotencyKey   IntegrationCall   User
+Notification   IdempotencyKey   IntegrationCall   User   Setting
 ```
 
 ## Entiteter
@@ -37,6 +37,7 @@ Notification   IdempotencyKey   IntegrationCall   User
 | `Notification` | Notifikationer | `recipient` er bruger-id eller rolle (`ROLE:KERNE`, `ROLE:SERVICE_OWNER`) |
 | `IdempotencyKey` | Idempotente kald | Udsendelse, påmindelse, modtagelse og administrativ kontrol returnerer det gemte svar ved gentagelse |
 | `IntegrationCall` | Simulerede kald til AuditFlow og SharePoint | Bruges til demo og test af fejl/genforsøg |
+| `Setting` | Prototype-indstillinger | `demoToday`: fælles demodato. Ikke en del af domænet |
 
 ## Statusser
 

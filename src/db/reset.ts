@@ -22,5 +22,6 @@ export async function resetDatabase(db: PrismaClient): Promise<void> {
     db.idempotencyKey.deleteMany(),
     db.integrationCall.deleteMany(),
     db.user.deleteMany(),
+    db.setting.deleteMany(),
   ]);
 }
