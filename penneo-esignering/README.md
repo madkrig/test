@@ -92,6 +92,7 @@ docs/                        Penneo-integration, API, antagelser
 - **Penneo-integrationen:** [docs/penneo.md](docs/penneo.md) – hvilke Penneo-kald hvert trin svarer til, og hvad der skal på plads før en rigtig adapter.
 - **API:** [docs/api.md](docs/api.md).
 - **Antagelser og begrænsninger:** [docs/antagelser.md](docs/antagelser.md).
+- **Styling:** [docs/STYLING.md](docs/STYLING.md) – stylingbrief, der kan genbruges på andre features.
 
 ## Hvad er genbrugt fra Bankbekræftelser, og hvad er skåret væk
 

@@ -87,7 +87,7 @@ function RequestDetail({ id, demo, onChanged }: { id: string; demo: boolean; onC
         {r.archiveFailed && (
           <div className="error">
             <strong>Dokumentet er underskrevet, men ikke arkiveret i SharePoint.</strong>
-            <div style={{ marginTop: 10 }}>
+            <div className="error-actions">
               <button className="small" disabled={busy !== null} onClick={() => run('archive', () => api(`/api/signing-requests/${r.id}/archive`, { method: 'POST' }))}>
                 {busy === 'archive' ? 'Arkiverer …' : 'Prøv arkivering igen'}
               </button>
@@ -115,7 +115,7 @@ function RequestDetail({ id, demo, onChanged }: { id: string; demo: boolean; onC
             <li key={e.id}>
               <b>{EVENT_LABELS[e.action] ?? e.action}</b>{e.change && ` – ${e.change}`}
               {e.reason && <div>{e.reason}</div>}
-              <small style={{ display: 'block' }}>{formatDateTime(e.at)} · {e.actorId === 'system' ? 'System (Penneo-webhook)' : e.actorName}</small>
+              <small>{formatDateTime(e.at)} · {e.actorId === 'system' ? 'System (Penneo-webhook)' : e.actorName}</small>
             </li>
           ))}
         </ol>
@@ -215,7 +215,7 @@ function Opgaver() {
                   </tr>
                   {expanded === r.id && (
                     <tr className="detail">
-                      <td colSpan={5} className="detail-cell"><RequestDetail id={r.id} demo={demo} onChanged={load} /></td>
+                      <td colSpan={5}><RequestDetail id={r.id} demo={demo} onChanged={load} /></td>
                     </tr>
                   )}
                 </Fragment>

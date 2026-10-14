@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     onClick={(e) => { e.preventDefault(); setOpen(false); router.push(n.link); }}
                   >
                     {n.message}
-                    <small style={{ display: 'block', marginTop: 4 }}>{formatDateTime(n.createdAt)}</small>
+                    <small>{formatDateTime(n.createdAt)}</small>
                   </a>
                 ))}
               </div>
