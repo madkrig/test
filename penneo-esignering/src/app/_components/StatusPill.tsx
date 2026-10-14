@@ -4,11 +4,11 @@ import type { SigningRequestView } from '@/services/signing-service';
 export function StatusPill({ request }: { request: SigningRequestView }) {
   const { status, progress, archiveFailed } = request;
   if (status === 'AWAITING_SIGNATURES') {
-    return <span className="pill amber">Afventer underskrift · {progress.signed}/{progress.total}</span>;
+    return <span className="tag waiting">Afventer underskrift · {progress.signed}/{progress.total}</span>;
   }
   if (status === 'SIGNED') {
-    return archiveFailed ? <span className="pill red">Arkivering fejlede</span> : <span className="pill blue">Underskrevet – arkiveres</span>;
+    return archiveFailed ? <span className="tag failed">Arkivering fejlede</span> : <span className="tag neutral">Underskrevet – arkiveres</span>;
   }
-  if (status === 'REJECTED') return <span className="pill red">Afvist</span>;
-  return <span className="pill green">Fuldført</span>;
+  if (status === 'REJECTED') return <span className="tag failed">Afvist</span>;
+  return <span className="tag ok">Fuldført</span>;
 }

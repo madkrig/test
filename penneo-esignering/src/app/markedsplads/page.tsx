@@ -3,9 +3,8 @@
 import { useCallback, useState } from 'react';
 import { PenneoSigningModal } from '../_components/PenneoSigningModal';
 
-interface Item {
+interface Offer {
   id: string;
-  icon: string;
   title: string;
   category: string;
   description: string;
@@ -14,10 +13,9 @@ interface Item {
 }
 
 /** Ydelser på markedspladsen. Kun e-signering er en del af denne prototype. */
-const ITEMS: Item[] = [
+const OFFERS: Offer[] = [
   {
     id: 'penneo',
-    icon: '✍️',
     title: 'E-signering via Penneo',
     category: 'Afslutning',
     description: 'Send årsrapport, ledelseserklæring eller revisionsprotokollat til digital underskrift. Følg status i Opgaver – det underskrevne dokument arkiveres automatisk i SharePoint.',
@@ -25,7 +23,6 @@ const ITEMS: Item[] = [
   },
   {
     id: 'bank',
-    icon: '🏦',
     title: 'Bankbekræftelser',
     category: 'Løbende',
     description: 'Indhent bankbekræftelser via Kerne: population, udsendelse, påmindelser og arkivering.',
@@ -34,7 +31,6 @@ const ITEMS: Item[] = [
   },
   {
     id: 'advokat',
-    icon: '⚖️',
     title: 'Advokatbrev',
     category: 'Planlægning',
     description: 'Bestil advokatbreve til kundens advokater.',
@@ -43,7 +39,6 @@ const ITEMS: Item[] = [
   },
   {
     id: 'saldo',
-    icon: '📨',
     title: 'Saldomeddelelser',
     category: 'Løbende',
     description: 'Send saldomeddelelser til kunder og leverandører.',
@@ -57,44 +52,37 @@ export default function Markedsplads() {
   const [open, setOpen] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
   const q = query.trim().toLowerCase();
-  const items = ITEMS.filter((i) => !q || `${i.title} ${i.description} ${i.category}`.toLowerCase().includes(q));
+  const offers = OFFERS.filter((o) => !q || `${o.title} ${o.description} ${o.category}`.toLowerCase().includes(q));
+  const available = OFFERS.filter((o) => o.available).length;
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Markedsplads</h1>
-          <div className="muted">Vælg en ydelse, og bestil den direkte på din kunde.</div>
-        </div>
-        <input type="search" placeholder="Søg i ydelser …" value={query} onChange={(e) => setQuery(e.target.value)} style={{ maxWidth: 280 }} />
-      </div>
-
-      <div className="tiles">
-        {items.map((item) => (
-          <div key={item.id} className={`tile ${item.available ? 'available' : 'unavailable'}`}>
-            <div className="tile-top">
-              <div className="tile-icon" aria-hidden="true">{item.icon}</div>
-              <div>
-                <h2>{item.title}</h2>
-                <span className="tag">{item.category}</span>
+      <div className="topline"><span>Markedsplads</span><span>{available} af {OFFERS.length} ydelser tilgængelige</span></div>
+      <section className="card">
+        <h2>Bestil en ydelse</h2>
+        <p>Vælg en ydelse, og bestil den direkte på din kunde. Status følger du under Opgaver.</p>
+        <input className="search" type="search" aria-label="Søg i ydelser" placeholder="Søg i ydelser …" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="catalog">
+          {offers.map((o) => (
+            <article key={o.id} className={`offer ${o.available ? '' : 'muted'}`}>
+              <span className="eyebrow">{o.category}</span>
+              <h3>{o.title}</h3>
+              <p>{o.description}</p>
+              <div className="offer-foot">
+                {o.available ? (
+                  <>
+                    <small>Penneo · SharePoint</small>
+                    <button onClick={() => setOpen(o.id)}>Start e-signering</button>
+                  </>
+                ) : (
+                  <small>{o.note}</small>
+                )}
               </div>
-            </div>
-            <p>{item.description}</p>
-            <div className="tile-foot">
-              {item.available ? (
-                <>
-                  <span className="tag gold">Penneo</span>
-                  <button className="btn" onClick={() => setOpen(item.id)}>Start</button>
-                </>
-              ) : (
-                <span className="muted small">{item.note}</span>
-              )}
-            </div>
-          </div>
-        ))}
-        {items.length === 0 && <div className="muted">Ingen ydelser matcher søgningen.</div>}
-      </div>
-
+            </article>
+          ))}
+        </div>
+        {offers.length === 0 && <p className="help">Ingen ydelser matcher søgningen.</p>}
+      </section>
       {open === 'penneo' && <PenneoSigningModal onClose={close} />}
     </>
   );

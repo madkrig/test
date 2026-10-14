@@ -10,6 +10,8 @@ interface Client { id: string; name: string; cvr: string }
 interface Signer { id: string; name: string; email: string | null; roleLabel: string }
 interface SignersData { signers: Signer[]; blockers: string[]; documentTitle: string; message: string }
 
+const STEPS = ['Ydelse og kunde', 'Dokument og besked', 'Kvittering'] as const;
+
 function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -21,17 +23,21 @@ function readAsBase64(file: File): Promise<string> {
 
 function ErrorBox({ error }: { error: ApiErrorBody }) {
   return (
-    <div className="alert error" role="alert">
+    <div className="error" role="alert">
       <strong>{error.message}</strong>
       {error.reasons && <ul>{error.reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
-      {error.recovery && <div className="small">{error.recovery}</div>}
+      {error.recovery && <div>{error.recovery}</div>}
     </div>
   );
 }
 
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return <div className="stat"><span>{label}</span><strong>{value}</strong></div>;
+}
+
 /**
- * Markedspladsens dialog: 1) ydelse og kunde → underskrivere fra stamdata,
- * 2) dokument og besked → send til Penneo, 3) kvittering med link til Opgaver.
+ * Markedspladsens guide i tre trin: 1) ydelse og kunde → underskrivere fra
+ * stamdata, 2) dokument og besked → send til Penneo, 3) kvittering.
  */
 export function PenneoSigningModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -97,130 +103,167 @@ export function PenneoSigningModal({ onClose }: { onClose: () => void }) {
 
   const service = services.find((s) => s.type === serviceType);
   const client = clients.find((c) => c.id === clientId);
-  const canContinue = !!signersData && signersData.blockers.length === 0 && signersData.signers.length > 0;
+  const signers = signersData?.signers ?? [];
+  const canContinue = !!signersData && signersData.blockers.length === 0 && signers.length > 0;
 
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="penneo-title">
-        <div className="modal-head">
-          <div>
-            <h2 id="penneo-title">E-signering via Penneo</h2>
-            <div className="steps">
-              <span className={step === 1 ? 'on' : ''}>1 · Ydelse og kunde</span>
-              <span className={step === 2 ? 'on' : ''}>2 · Dokument og afsendelse</span>
-              <span className={step === 3 ? 'on' : ''}>3 · Kvittering</span>
-            </div>
-          </div>
-          <button className="close" onClick={onClose} aria-label="Luk">×</button>
-        </div>
-
-        <div className="modal-body">
-          {step === 1 && (
-            <>
-              <label className="field">
-                <span>Ydelse</span>
-                <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-                  {services.map((s) => <option key={s.type} value={s.type}>{s.label}</option>)}
-                </select>
-                {service && <div className="muted small" style={{ marginTop: 4 }}>{service.description}</div>}
-              </label>
-              <label className="field">
-                <span>Kunde</span>
-                <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                  <option value="">Vælg kunde …</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name} · CVR {c.cvr}</option>)}
-                </select>
-              </label>
-
-              {loadingSigners && <div className="muted">Henter underskrivere fra stamdata …</div>}
-              {signersData && (
-                <>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Underskrivere fra kundens stamdata</div>
-                  {signersData.signers.length > 0 && (
-                    <div className="signers">
-                      {signersData.signers.map((s) => (
-                        <div className="signer" key={s.id}>
-                          <div>{s.name}</div>
-                          <div className="role">{s.roleLabel}</div>
-                          <div className="muted small">{s.email ?? 'Mangler e-mail'}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {signersData.blockers.length > 0 && (
-                    <div className="alert warn">
-                      <strong>Forløbet kan ikke startes endnu</strong>
-                      <ul>{signersData.blockers.map((b) => <li key={b}>{b}</li>)}</ul>
-                      <div className="small">Ret kundens underskrivere i stamdata, og prøv igen.</div>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          {step === 2 && signersData && (
-            <>
-              <label className="field">
-                <span>Dokumenttitel</span>
-                <input type="text" value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Dokument (PDF)</span>
-                <input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                <div className="muted small" style={{ marginTop: 4 }}>
-                  {file ? `${file.name} · ${Math.ceil(file.size / 1024)} KB` : 'Ingen fil valgt – i demoen bruges et genereret dokument.'}
-                </div>
-              </label>
-              <label className="field">
-                <span>Besked til underskriverne</span>
-                <textarea value={message} onChange={(e) => setMessage(e.target.value)} />
-              </label>
-              <div className="alert info">
-                {signersData.signers.length} underskriver(e) hos {client?.name} modtager en underskriftsanmodning fra Penneo:{' '}
-                {signersData.signers.map((s) => s.name).join(', ')}. Når alle har underskrevet, arkiveres dokumentet
-                automatisk i SharePoint, og du får besked.
-              </div>
-            </>
-          )}
-
-          {step === 3 && created && (
-            <div className="success">
-              <div className="check">✓</div>
-              <h2>Underskriftsforløbet er startet i Penneo</h2>
-              <dl className="kv">
-                <dt>Dokument</dt><dd>{created.documentTitle}</dd>
-                <dt>Penneo-sag</dt><dd>#{created.penneo.caseFileId}</dd>
-                <dt>Status</dt><dd>{created.nextAction}</dd>
-                <dt>Afventer</dt><dd>{created.nextOwner}</dd>
-              </dl>
-            </div>
-          )}
-
-          {error && <ErrorBox error={error} />}
-        </div>
-
-        <div className="modal-foot">
-          {step === 1 && (
-            <>
-              <button className="btn secondary" onClick={onClose}>Annullér</button>
-              <button className="btn" disabled={!canContinue} onClick={() => setStep(2)}>Næste</button>
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <button className="btn secondary" onClick={() => setStep(1)} disabled={submitting}>Tilbage</button>
-              <button className="btn" onClick={submit} disabled={submitting || !documentTitle.trim()}>
-                {submitting ? 'Sender …' : 'Send til underskrift'}
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="penneo-title">
+        <div className="dialog-side">
+          <p className="eyebrow">Markedsplads</p>
+          <h2 id="penneo-title">E-signering via Penneo</h2>
+          <nav className="steps" aria-label="Trin">
+            {STEPS.map((name, i) => (
+              <button
+                key={name}
+                type="button"
+                className={step === i + 1 ? 'active' : i + 1 < step ? 'done' : ''}
+                disabled={submitting || !!created || i + 1 > step}
+                onClick={() => setStep((i + 1) as 1 | 2 | 3)}
+                aria-label={`Trin ${i + 1}: ${name}`}
+              >
+                <b>{i + 1 < step ? '✓' : i + 1}</b>{name}
               </button>
-            </>
-          )}
-          {step === 3 && created && (
-            <>
-              <button className="btn secondary" onClick={onClose}>Luk</button>
-              <Link className="btn" href={`/opgaver?id=${created.id}`} onClick={onClose} style={{ textDecoration: 'none' }}>Gå til Opgaver</Link>
-            </>
-          )}
+            ))}
+          </nav>
+        </div>
+
+        <div className="dialog-main">
+          <div className="dialog-body">
+            <div className="topline">
+              <span>Trin {step} af {STEPS.length}</span>
+              <button className="secondary close" onClick={onClose} aria-label="Luk">×</button>
+            </div>
+
+            {step === 1 && (
+              <>
+                <h2>Vælg ydelse og kunde</h2>
+                <p>Underskriverne hentes fra kundens stamdata. Mangler der noget, rettes det i stamdata – ikke her.</p>
+                <div className="grid">
+                  <label className="field">
+                    <span>Ydelse</span>
+                    <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+                      {services.map((s) => <option key={s.type} value={s.type}>{s.label}</option>)}
+                    </select>
+                    {service && <small>{service.description}</small>}
+                  </label>
+                  <label className="field">
+                    <span>Kunde</span>
+                    <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                      <option value="">Vælg …</option>
+                      {clients.map((c) => <option key={c.id} value={c.id}>{c.name} · CVR {c.cvr}</option>)}
+                    </select>
+                    <small>Kun kunder, hvor du er ansvarlig revisor.</small>
+                  </label>
+                </div>
+
+                {loadingSigners && <p className="progress" role="status">Henter underskrivere fra stamdata …</p>}
+                {signersData && (
+                  <>
+                    <h3>Underskrivere fra stamdata</h3>
+                    {signers.length > 0 && (
+                      <div className="table-wrap">
+                        <table className="stack">
+                          <thead><tr><th>Navn</th><th>Rolle</th><th>E-mail</th></tr></thead>
+                          <tbody>
+                            {signers.map((s) => (
+                              <tr key={s.id}>
+                                <td><strong>{s.name}</strong></td>
+                                <td data-label="Rolle">{s.roleLabel}</td>
+                                <td data-label="E-mail">{s.email ?? <span className="missing">Mangler e-mail</span>}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {signersData.blockers.length > 0 ? (
+                      <div className="notice">
+                        <strong>Forløbet kan ikke startes endnu.</strong>
+                        <ul>{signersData.blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+                      </div>
+                    ) : (
+                      <p className="help">Fratrådte personer og roller, som ydelsen ikke kræver, er udeladt.</p>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {step === 2 && signersData && (
+              <>
+                <h2>Dokument og besked</h2>
+                <p>Upload dokumentet som PDF, og tilpas beskeden. Penneo sender e-mailen til underskriverne.</p>
+                <div className="grid">
+                  <label className="field wide">
+                    <span>Dokumenttitel</span>
+                    <input type="text" value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} />
+                  </label>
+                </div>
+                <label className="drop">
+                  <strong>{file ? file.name : `Vælg ${service?.label.toLowerCase() ?? 'dokumentet'} som PDF`}</strong>
+                  <span>{file ? `${Math.ceil(file.size / 1024)} KB` : 'PDF, højst 10 MB · uden fil bruges et genereret demodokument'}</span>
+                  <input aria-label="Dokument (PDF)" type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                </label>
+                <div className="grid">
+                  <label className="field wide">
+                    <span>Besked til underskriverne</span>
+                    <textarea value={message} onChange={(e) => setMessage(e.target.value)} />
+                  </label>
+                </div>
+                <h3>Opsummering</h3>
+                <dl>
+                  <dt>Kunde</dt><dd>{client?.name} · CVR {client?.cvr}</dd>
+                  <dt>Ydelse</dt><dd>{service?.label}</dd>
+                  <dt>Underskrivere</dt><dd>{signers.map((s) => `${s.name} (${s.roleLabel})`).join(', ')}</dd>
+                  <dt>Efter underskrift</dt><dd>Dokumentet arkiveres i SharePoint, og du får besked.</dd>
+                </dl>
+              </>
+            )}
+
+            {step === 3 && created && (
+              <>
+                <span className="result-tag">Sendt til Penneo</span>
+                <h2>Underskriftsforløbet er startet</h2>
+                <p>Følg status under Opgaver. Du får besked, når alle har underskrevet, og dokumentet er arkiveret.</p>
+                <div className="stats">
+                  <Stat label="Penneo-sag" value={`#${created.penneo.caseFileId}`} />
+                  <Stat label="Underskrivere" value={created.progress.total} />
+                </div>
+                <dl>
+                  <dt>Dokument</dt><dd>{created.documentTitle}</dd>
+                  <dt>Status</dt><dd>{created.nextAction}</dd>
+                  <dt>Afventer</dt><dd>{created.nextOwner}</dd>
+                </dl>
+              </>
+            )}
+
+            {error && <ErrorBox error={error} />}
+            {submitting && <p role="status" className="progress">Sender til Penneo …</p>}
+          </div>
+
+          <div className="actions">
+            {step === 1 && (
+              <>
+                <button className="secondary" onClick={onClose}>Annullér</button>
+                <button disabled={!canContinue} onClick={() => setStep(2)}>Fortsæt til dokument</button>
+              </>
+            )}
+            {step === 2 && (
+              <>
+                <button className="secondary" onClick={() => setStep(1)} disabled={submitting}>Tilbage</button>
+                <button onClick={submit} disabled={submitting || !documentTitle.trim()}>
+                  {submitting ? 'Sender …' : 'Send til underskrift'}
+                </button>
+              </>
+            )}
+            {step === 3 && created && (
+              <>
+                <button className="secondary" onClick={onClose}>Luk</button>
+                <Link className="button" href={`/opgaver?id=${created.id}`} onClick={onClose}>Gå til Opgaver</Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -29,6 +29,8 @@ sequenceDiagram
 
 ## Skærmbilleder
 
+Brugerfladen følger det visuelle sprog fra [Cedra Stikprøveberegner](https://github.com/madkrig/cedra-stikproeveberegner) (`frontend/src/style.css`): "cedra"-ordmærke, aside med nummereret navigation, topline over et hvidt kort, felter i to kolonner og handlingslinje nederst. Dialogen er bygget som stikprøveberegnerens guide (*Trin 1 af 3*). På mobil stables tabellerne som kort.
+
 | Markedsplads | Dialog: underskrivere fra stamdata |
 |---|---|
 | ![Markedsplads](docs/screenshots/1-markedsplads.png) | ![Dialog](docs/screenshots/2-dialog-underskrivere.png) |
@@ -51,9 +53,9 @@ npm run typecheck
 
 ## Demo på 2 minutter
 
-1. Åbn **Markedsplads** → **E-signering via Penneo** → **Start**.
+1. Åbn **Markedsplads** → **E-signering via Penneo** → **Start e-signering**.
 2. Ydelse *Årsrapport*, kunde *Nordhavn Teknik A/S* → systemet viser Mette Hansen (direktør), Lars Holm (bestyrelsesformand) og Anne Kjær (bestyrelsesmedlem). Peter Juul er fratrådt og kommer ikke med.
-3. **Næste** → upload evt. en PDF (ellers bruges et genereret demodokument) → **Send til underskrift**.
+3. **Fortsæt til dokument** → upload evt. en PDF (ellers bruges et genereret demodokument) → **Send til underskrift**.
 4. **Gå til Opgaver**: status *Afventer underskrift · 0/3*, afventer alle tre.
 5. Klik **Simulér underskrift (demo)** ud for hver underskriver. Knappen spiller Penneos rolle og sender de samme webhooks, som Penneo ville sende, gennem den rigtige webhook-handler.
 6. Efter den sidste: status *Fuldført*, link til SharePoint, og 🔔 viser en notifikation.
