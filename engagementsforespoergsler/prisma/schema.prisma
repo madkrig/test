@@ -1,0 +1,446 @@
+// EF-service – datamodel efter løsningsdesignet, kap. 9. Syntetiske data.
+// SQLite har ikke enums: statusser er strenge (valideret i domænelaget).
+// Beløb gemmes som hele øre (Float uden decimaler er eksakt op til 9·10^15).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Kildesystemer (mock): Maconomy, CVR, Hailey/Entra ID, SAF-T, Auditflow.
+// I produktion hentes disse via Cedra API; EF-service gemmer kun referencer.
+// ---------------------------------------------------------------------------
+
+/// Medarbejder (Hailey / Entra ID). Rolle svarer til Entra ID-gruppen.
+model User {
+  id         String @id
+  name       String
+  initials   String
+  role       String // OR | RM | KM | KL | PE | ADMIN | SYSTEM
+  department String
+}
+
+/// Kunde og virksomhed (Maconomy + CVR).
+model SrcCustomer {
+  id                   String  @id
+  name                 String
+  cvr                  String  @unique
+  cvrStatus            String // NORMAL | KONKURS | LIKVIDATION | OPHOERT
+  signingRule          String // tegningsregel som tekst fra CVR
+  signingRuleChangedAt String
+  confidential         Boolean @default(false)
+  confidentialUserIds  String  @default("[]")
+  contactEmail         String
+}
+
+/// Personer i ledelsen (CVR). to = null betyder aktuel.
+model SrcPerson {
+  id         String  @id
+  customerId String
+  unitNumber String
+  name       String
+  role       String // DIREKTOER | FORMAND | BESTYRELSESMEDLEM
+  from       String
+  to         String?
+}
+
+/// Erklæringsopgave (Maconomy).
+model SrcEngagement {
+  id             String  @id
+  customerId     String
+  type           String // REVISION | UDVIDET_GENNEMGANG | REVIEW | OPSTILLING
+  periodStart    String
+  periodEnd      String
+  plannedSignOff String
+  responsibleId  String?
+  department     String
+  status         String  @default("AKTIV") // AKTIV | ANNULLERET
+  optIn          Boolean @default(false)
+  createdAt      String
+}
+
+model SrcTeamMember {
+  engagementId String
+  userId       String
+
+  @@id([engagementId, userId])
+}
+
+/// Habilitetsspærring (HS).
+model SrcConflict {
+  userId     String
+  customerId String
+
+  @@id([userId, customerId])
+}
+
+/// Bogført saldo pr. balancedag (SAF-T / saldobalance).
+model SrcLedgerAccount {
+  id          String  @id
+  customerId  String
+  balanceDate String
+  accountRef  String
+  name        String
+  instituteId String?
+  balanceOre  Float
+}
+
+/// Grænse for klart ubetydelige beløb (Auditflow).
+model SrcMateriality {
+  engagementId     String @id
+  trivialThreshold Float
+}
+
+/// Nationalbankens kurser (AR-10).
+model SrcFxRate {
+  date     String
+  currency String
+  rate     Float
+
+  @@id([date, currency])
+}
+
+/// Pengeinstituttets data – bruges af demo-simulatoren til at danne svar.
+model SrcBankStatement {
+  id            String @id
+  customerId    String
+  instituteId   String
+  balanceDate   String
+  lines         String // JSON
+  signingRights String // JSON
+}
+
+// ---------------------------------------------------------------------------
+// EF-service ejer disse objekter.
+// ---------------------------------------------------------------------------
+
+/// Pengeinstitut (bankregister) – erstatter banklister i Excel/Access.
+model Institute {
+  id                   String  @id
+  name                 String
+  cvr                  String
+  regNos               String  @default("[]")
+  counterpartyType     String  @default("PENGEINSTITUT")
+  channel              String // EMAIL | WEBFORM | BULKFIL | PLATFORM | MANUEL
+  channelAddress       String
+  senderDomains        String  @default("[]")
+  authRequirement      String  @default("GENEREL") // GENEREL | BANKSPECIFIK
+  authMaxAgeMonths     Int?
+  responseWorkdays     Int
+  seasonDeadline       String?
+  earliestSendOffset   Int     @default(1)
+  latestSendOffset     Int?
+  /// K4: gennemsnitlig afvigelse fra SLA i hverdage, beregnet af historikken.
+  slaDeviationWorkdays Float   @default(0)
+  slaSampleSize        Int     @default(0)
+  fee                  String?
+  template             String  @default("B.1")
+  bulkFileRule         String?
+  source               String
+  verifiedAt           String
+  verifiedById         String?
+  mergedIntoId         String?
+  active               Boolean @default(true)
+  version              Int     @default(1)
+}
+
+/// Ændring i bankregisteret, der kræver 4-øjne (kanal og kanaladresse).
+model InstituteChange {
+  id            String  @id
+  instituteId   String
+  field         String
+  oldValue      String
+  newValue      String
+  reason        String
+  requestedById String
+  requestedAt   String
+  status        String // PENDING | APPROVED | REJECTED
+  decidedById   String?
+  decidedAt     String?
+}
+
+/// Versioneret regel (kap. 6). Parametre er data, ikke kode.
+model Rule {
+  id          String  @id
+  ruleId      String
+  version     Int
+  type        String // TR | VR | AR | ER | FR
+  title       String
+  description String
+  params      String // JSON
+  activeFrom  String
+  activeTo    String?
+  changedById String
+  reason      String
+
+  @@unique([ruleId, version])
+}
+
+/// Forespørgselssag – én pr. erklæringsopgave og balancedag.
+model Case {
+  id                   String  @id
+  engagementId         String  @unique
+  customerId           String
+  cvr                  String
+  engagementType       String
+  balanceDate          String
+  plannedSignOff       String
+  responsibleId        String?
+  /// Kernemedarbejderen, der ejer sagens kerneteam-opgaver (K3).
+  coreUserId           String?
+  department           String
+  status               String
+  isNewCustomer        Boolean @default(false)
+  rulesAsOf            String
+  bankListApprovedById String?
+  bankListApprovedAt   String?
+  delegateId           String?
+  delegateUntil        String?
+  conclusion           String?
+  concludedById        String?
+  concludedAt          String?
+  lockedAt             String?
+  reopenReason         String?
+  nextAction           String  @default("")
+  nextOwner            String  @default("")
+  createdAt            String
+  updatedAt            String
+}
+
+model BankListLine {
+  id                 String  @id
+  caseId             String
+  instituteId        String
+  sources            String  @default("[]") // SIDSTE_AAR | SAFT | KUNDE | MANUEL | AGENT
+  included           Boolean @default(true)
+  deselectReason     String?
+  customerConfirmed  Boolean @default(false)
+  addedAfterApproval Boolean @default(false)
+  createdAt          String
+
+  @@unique([caseId, instituteId])
+}
+
+/// Én anmodning til ét pengeinstitut.
+model Inquiry {
+  id                   String  @id
+  reference            String  @unique
+  caseId               String
+  instituteId          String
+  fuldmagtId           String?
+  type                 String // AARLIG | ADHOC | PRIMO
+  statementDate        String
+  status               String
+  channel              String
+  plannedSendDate      String
+  sentAt               String?
+  sentById             String?
+  batchId              String?
+  responseDeadline     String?
+  /// K1: svarfrist + instituttets historiske afvigelse fra SLA.
+  expectedResponseDate String?
+  reminderCount        Int     @default(0)
+  lastReminderAt       String?
+  rejectionReason      String?
+  rejectedAt           String?
+  cancelReason         String?
+  escalatedAt          String?
+  alternativeActions   String?
+  responseRequired     Boolean @default(false)
+  adhocReason          String?
+  requestedById        String?
+  approvedById         String?
+  createdAt            String
+  updatedAt            String
+}
+
+/// Batch pr. institut og kanal – erstatter VBA-scriptets masseudsendelse.
+model Batch {
+  id             String  @id
+  instituteId    String
+  channel        String
+  createdById    String
+  createdAt      String
+  idempotencyKey String  @unique
+  receipt        String  @default("{}")
+  fileName       String?
+}
+
+model Fuldmagt {
+  id                  String  @id
+  customerId          String
+  cvr                 String
+  holderName          String
+  holderCvr           String
+  scope               String // GENEREL | BANKSPECIFIK
+  instituteId         String?
+  status              String
+  signedDate          String?
+  validTo             String?
+  signingRuleSnapshot String
+  signingSource       String // PENNEO | MANUEL
+  penneoCaseId        String?
+  documentRef         String?
+  sentForSigningAt    String?
+  uploadedById        String?
+  verifiedById        String?
+  verifiedAt          String?
+  invalidReason       String?
+  createdAt           String
+}
+
+model FuldmagtSigner {
+  id            String  @id
+  fuldmagtId    String
+  unitNumber    String
+  name          String
+  role          String
+  mitidVerified Boolean @default(false)
+  signedAt      String?
+}
+
+model Response {
+  id                     String  @id
+  inquiryId              String?
+  receivedAt             String
+  channel                String
+  sender                 String
+  senderVerified         Boolean
+  subject                String
+  statementDate          String?
+  documentRef            String
+  extractionMethod       String  @default("AI")
+  extractionApprovedById String?
+  extractionApprovedAt   String?
+  matchStatus            String // MATCHED | UNMATCHED
+  invalidReason          String?
+  content                String  @default("{}")
+}
+
+model ResponseLine {
+  id                  String  @id
+  responseId          String
+  category            String
+  accountRef          String?
+  description         String
+  currency            String  @default("DKK")
+  amountOre           Float?
+  amountDkkOre        Float?
+  securityDescription String?
+  aiConfidence        Float?
+  verifiedById        String?
+  sortOrder           Int     @default(0)
+}
+
+model ReconLine {
+  id              String  @id
+  inquiryId       String
+  responseLineId  String?
+  ledgerAccountId String?
+  bookedOre       Float?
+  differenceOre   Float
+  matchStatus     String // MATCH | DIFFERENCE | KUN_I_SVAR | KUN_I_BOGFOERING
+  explanation     String?
+}
+
+model Deviation {
+  id              String  @id
+  caseId          String
+  inquiryId       String?
+  reconLineId     String?
+  type            String
+  severity        String // KRITISK | VAESENTLIG | FORKLARET | UVAESENTLIG
+  status          String // AABEN | UNDER_VURDERING | LUKKET
+  decision        String?
+  description     String
+  amountOre       Float?
+  justification   String?
+  preparedById    String?
+  approvedById    String?
+  approvedAt      String?
+  sentToAuditorAt String?
+  createdAt       String
+}
+
+/// Arbejdsopgave (OPG-01–15) – altid én ansvarlig og en frist (K3).
+model Task {
+  id            String  @id
+  caseId        String?
+  parentId      String?
+  type          String
+  title         String
+  inquiryId     String?
+  deviationId   String?
+  fuldmagtId    String?
+  role          String
+  assigneeId    String?
+  status        String // AABEN | I_GANG | VENTER | LUKKET | ANNULLERET
+  dueDate       String
+  createdByRule String?
+  snoozedUntil  String?
+  createdAt     String
+  closedAt      String?
+}
+
+model Document {
+  id        String  @id
+  caseId    String?
+  kind      String // FULDMAGT | SVAR | FORESPOERGSEL | BULKFIL | KONKLUSION
+  title     String
+  ref       String
+  createdAt String
+}
+
+/// Uforanderlig hændelseslog. Applikationslaget opretter kun.
+model Event {
+  id         String  @id
+  objectType String
+  objectId   String
+  caseId     String?
+  action     String
+  actorId    String
+  onBehalfOf String?
+  source     String  @default("BRUGER") // BRUGER | SYSTEM | AGENT
+  at         String
+  before     String?
+  after      String?
+  reason     String?
+}
+
+model Notification {
+  id          String  @id
+  recipientId String
+  type        String
+  message     String
+  link        String
+  channel     String // BRUGERFLADE | TEAMS | EMAIL | DAGLIG
+  createdAt   String
+  readAt      String?
+}
+
+model IdempotencyKey {
+  key       String @id
+  operation String
+  response  String
+  createdAt String
+}
+
+model IntegrationCall {
+  id        String  @id
+  system    String
+  operation String
+  payload   String
+  ok        Boolean
+  at        String
+}
+
+/// Driftsindstillinger, fx demo-dato og nuværende Cedra-enhed.
+model Setting {
+  key   String @id
+  value String
+}
