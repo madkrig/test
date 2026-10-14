@@ -33,7 +33,7 @@ export default async function Home() {
       </div>
       {pick.length === 0 ? (
         <Card title="Ingen data">
-          <p>Databasen er tom. Kør <code>npm run db:push && npm run seed</code>.</p>
+          <p>Databasen er tom. Kør <code>npm run setup</code>.</p>
         </Card>
       ) : (
         <Card title="Vælg rolle">

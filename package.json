@@ -4,6 +4,9 @@
   "private": true,
   "description": "Workflowprototype for Cedras bankbekræftelser (AuditFlow + Kerne). Syntetiske data.",
   "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
@@ -11,6 +14,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "setup": "node scripts/setup.mjs",
     "db:push": "prisma db push --skip-generate",
     "seed": "tsx --tsconfig tsconfig.json scripts/seed.ts",
     "seed:brief": "tsx --tsconfig tsconfig.json scripts/seed.ts --state=brief",

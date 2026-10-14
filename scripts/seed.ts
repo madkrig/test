@@ -1,6 +1,10 @@
+import { existsSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 import { seed, type SeedState } from '../src/db/seed';
 import { today } from '../src/services/clock';
+
+// Indlæs .env, så seeden virker uafhængigt af, hvornår Prisma-klienten blev genereret.
+if (!process.env.DATABASE_URL && existsSync('.env')) process.loadEnvFile('.env');
 
 const state = (process.argv.find((a) => a.startsWith('--state='))?.split('=')[1] ?? 'start') as SeedState;
 const db = new PrismaClient();

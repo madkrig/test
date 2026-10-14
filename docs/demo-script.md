@@ -5,8 +5,8 @@ Ca. 15 minutter. Følger Figma-siden *Bankbekræftelser – MVP (brief v1.0)*, F
 **Forberedelse**
 
 ```bash
-npm run db:push
-npm run seed      # starttilstand, demodato 12.11.2026
+npm install
+npm run setup     # .env, database og starttilstand (demodato 12.11.2026)
 npm run dev       # http://localhost:3000
 ```
 

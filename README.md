@@ -15,17 +15,27 @@ Designreference: Figma-siden *Bankbekræftelser – MVP (brief v1.0)*.
 
 ## Kom i gang
 
+Kræver [Node.js 20.12 eller nyere (LTS)](https://nodejs.org) og Git. Kommandoerne virker ens i Windows (cmd/PowerShell), macOS og Linux.
+
 ```bash
-npm install            # kører også prisma generate
-cp .env.example .env   # DATABASE_URL="file:./dev.db"
-npm run db:push        # opretter SQLite-databasen
-npm run seed           # startdata (eller: npm run seed:brief for demo-tilstanden fra briefet)
-npm run dev            # http://localhost:3000 – vælg rolle på forsiden
-npm test               # unit + integrationstests (bruger separat prisma/test.db)
-npm run typecheck      # TypeScript strict
+git clone -b claude/pensive-archimedes-o4tspq https://github.com/madkrig/test.git cedra-bank
+cd cedra-bank
+npm install            # installerer pakker og kører prisma generate
+npm run setup          # opretter .env, databasen og demodata (demodato 12.11.2026)
+npm run dev            # åbn http://localhost:3000 og vælg rolle på forsiden
 ```
 
-`seed:brief` stiller uret til 15.01.2027: Nordhavn Teknik A/S har Danske Bank modtaget og arkiveret, Jyske Bank modtaget med afvigelse (åben beslutning) og Sydbank afventende efter 1. påmindelse.
+- `npm run setup -- --brief` starter i brief-tilstanden (demodato 15.01.2027).
+- Data kan også nulstilles fra forsiden i appen.
+- Læg projektet i en lokal mappe (fx `C:\dev\cedra-bank`), ikke i roden af et drev eller på et netværksdrev. npm fejler i roden af et drev ("Tracker idealTree already exists"), og SQLite er upålidelig på netværksdrev.
+
+Øvrige kommandoer:
+
+```bash
+npm test               # unit + integrationstests (bruger separat prisma/test.db)
+npm run typecheck      # TypeScript strict
+npm run seed           # nulstil demodata (starttilstand)
+```
 
 Gennemgang af demoen: [docs/demo-script.md](docs/demo-script.md).
 
